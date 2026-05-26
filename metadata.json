@@ -1,0 +1,6 @@
+{
+  "name": "Campus Foods",
+  "description": "Your ultimate campus food hub. Pre-order, customize, and deliver delicious meals right to your hostel or lecture hall.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
