@@ -8,7 +8,8 @@ import {
   Package, 
   Trash2, 
   UserX,
-  Edit
+  Edit,
+  Printer
 } from 'lucide-react';
 import { User, Order, MenuItem } from '../types';
 
@@ -26,6 +27,7 @@ interface AdminSectionProps {
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
   handleDeleteCatalogItem: (mealId: string, name: string) => void;
   handleDeleteUserAccount: (email: string, fullname: string) => void;
+  handlePrintOrder: (order: Order) => void;
 }
 
 export default function AdminSection({
@@ -41,7 +43,8 @@ export default function AdminSection({
   handleToggleAvailability,
   updateOrderStatus,
   handleDeleteCatalogItem,
-  handleDeleteUserAccount
+  handleDeleteUserAccount,
+  handlePrintOrder
 }: AdminSectionProps) {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in font-sans">
@@ -140,7 +143,7 @@ export default function AdminSection({
                       </p>
                     </div>
                     <hr className="border-slate-100 my-1" />
-                    <div className="flex justify-between items-center pt-1 text-xs">
+                    <div className="flex justify-between items-center pt-1 text-xs mb-2">
                       <span className="truncate pr-1"><span className="font-bold text-slate-550">Spot:</span> {order.address}</span>
                       {order.estimatedMinutes && (
                         <span className="text-amber-700 font-bold flex items-center gap-0.5 shrink-0 text-[10px] bg-amber-50 px-1.5 py-0.5 rounded-md">
@@ -149,6 +152,19 @@ export default function AdminSection({
                         </span>
                       )}
                       <span className="text-slate-900 font-extrabold text-xs shrink-0">Total: ₦{order.total}</span>
+                    </div>
+
+                    {/* Printer ticket control row */}
+                    <div className="border-t border-slate-150 pt-2 flex justify-between items-center gap-2">
+                      <span className="text-[10px] font-black text-slate-400 tracking-wider">KITCHEN ACTIONS</span>
+                      <button 
+                        type="button"
+                        onClick={() => handlePrintOrder(order)}
+                        className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-3 py-1.5 rounded-lg text-[10.5px] uppercase tracking-wider flex items-center gap-1 cursor-pointer transition border-0 shadow-3xs"
+                        title="Print physical copy / Kitchen Ticket copy"
+                      >
+                        <Printer className="w-3.5 h-3.5" /> Print Receipt
+                      </button>
                     </div>
                   </div>
 
@@ -181,8 +197,8 @@ export default function AdminSection({
                       <h4 className="font-bold text-slate-900 text-xs sm:text-sm line-clamp-1">{item.name}</h4>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-slate-500 text-[10px] font-semibold">₦{item.price} • {item.category}</span>
-                        <span className={`text-[8px] px-1 py-0.2 rounded font-black tracking-wider uppercase ${item.available !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                          {item.available !== false ? 'In Stock' : 'Sold Out'}
+                        <span className={`text-[8px] px-1 py-0.2 rounded font-black tracking-wider uppercase ${item.available !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-850'}`}>
+                          {item.available !== false ? 'In Stock' : 'Out Of Stock'}
                         </span>
                       </div>
                     </div>
@@ -191,10 +207,10 @@ export default function AdminSection({
                     <button
                       type="button"
                       onClick={() => handleToggleAvailability(item.id)}
-                      className={`px-2 py-1 rounded text-[9px] font-bold uppercase cursor-pointer border-0 transition duration-150 ${item.available !== false ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-250 border-solid' : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-250 border-solid'}`}
-                      title="Toggle availability status"
+                      className={`px-2.5 py-1 rounded text-[9.5px] font-black uppercase cursor-pointer border border-solid transition duration-155 shadow-3xs ${item.available !== false ? 'bg-emerald-100 text-emerald-850 border-emerald-300 hover:bg-emerald-200' : 'bg-red-50 text-red-750 border-red-355 hover:bg-red-100'}`}
+                      title={item.available !== false ? "Change status to Out of Stock" : "Change status to In Stock"}
                     >
-                      {item.available !== false ? 'Available' : 'Unavailable'}
+                      {item.available !== false ? '✓ In Stock' : '✗ Out of Stock'}
                     </button>
                     <button 
                       type="button"

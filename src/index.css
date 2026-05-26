@@ -9,6 +9,37 @@ body {
   font-family: var(--font-plus);
 }
 
+/* Print thermal receipt styles */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  /* Hide main React root components during print */
+  #root > *:not(#receipt-print-root) {
+    display: none !important;
+  }
+  
+  /* Show receipt container */
+  #receipt-print-root {
+    display: block !important;
+    width: 100% !important;
+    max-width: 320px !important; /* Ideal standard thermal paper width */
+    margin: 0 auto !important;
+    padding: 8px !important;
+    background: white !important;
+    color: black !important;
+    font-family: monospace !important;
+  }
+  
+  /* Reset shadows and borders for paper */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 8px;

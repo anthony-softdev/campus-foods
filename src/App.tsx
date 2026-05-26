@@ -138,6 +138,25 @@ export default function App() {
   const [newMealDesc, setNewMealDesc] = useState('');
   const [newMealPrice, setNewMealPrice] = useState('');
   const [newMealImage, setNewMealImage] = useState('');
+  const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
+
+  // Clear print order status after printing dialog is finalized or closed
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      setPrintingOrder(null);
+    };
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+  }, []);
+
+  const handlePrintOrder = (order: Order) => {
+    setPrintingOrder(order);
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
 
   // Contact Message Inputs
   const [contactName, setContactName] = useState('');
@@ -959,6 +978,7 @@ export default function App() {
             updateOrderStatus={updateOrderStatus}
             handleDeleteCatalogItem={handleDeleteCatalogItem}
             handleDeleteUserAccount={handleDeleteUserAccount}
+            handlePrintOrder={handlePrintOrder}
           />
         )}
 
@@ -1035,6 +1055,81 @@ export default function App() {
         isVisible={isToastVisible}
         message={toastMessage}
       />
+
+      {/* ================= HIDDEN PRINT-ONLY THERMAL RECEIPT CONTAINER ================= */}
+      {printingOrder && (
+        <div id="receipt-print-root" className="hidden print:block text-black font-mono">
+          <div className="text-center border-b-2 border-dashed border-black pb-4 mb-4">
+            <h1 className="text-lg font-bold tracking-wider uppercase">CAMPUS FOODS</h1>
+            <p className="text-xs">CAMPUS CATERING & LUNCH DELIVERY</p>
+            <p className="text-[10px] mt-1">{new Date(printingOrder.timestamp || Date.now()).toLocaleString()}</p>
+          </div>
+
+          <div className="space-y-1.5 text-xs mb-4">
+            <div className="flex justify-between">
+              <span className="font-bold">ORDER TICKET #:</span>
+              <span className="font-bold text-sm bg-black text-white px-1.5">{printingOrder.orderId}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>STATUS:</span>
+              <span className="uppercase font-bold">{printingOrder.status}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>DELIVERY TYPE:</span>
+              <span className="uppercase font-bold">{printingOrder.deliveryType}</span>
+            </div>
+            <div className="border-t border-dashed border-black pt-1.5 mt-1.5">
+              <p className="font-bold">CUSTOMER PROFILE:</p>
+              <p>{printingOrder.userName} ({printingOrder.phone})</p>
+              <p className="font-bold mt-1.5">KITCHEN DESTINATION:</p>
+              <p className="underline font-bold text-sm">{printingOrder.address}</p>
+            </div>
+          </div>
+
+          <div className="border-t-2 border-b-2 border-dashed border-black py-2.5 my-3 text-xs">
+            <div className="flex justify-between font-bold border-b border-dashed border-black pb-1.5 mb-1.5">
+              <span>QTY / ITEM / EXTRAS</span>
+              <span>PRICE</span>
+            </div>
+            <div className="space-y-2.5">
+              {printingOrder.items.map((item, idx) => (
+                <div key={item.cartId || idx} className="space-y-0.5">
+                  <div className="flex justify-between items-start font-bold">
+                    <span>{item.quantity}x {item.name}</span>
+                    <span>₦{item.unitPrice * item.quantity}</span>
+                  </div>
+                  {item.extras && item.extras.length > 0 && (
+                    <div className="pl-4 text-[10px] text-zinc-900 border-l border-zinc-400">
+                      Options: {item.extras.map(e => e.label).join(', ')}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1 text-xs text-right border-b border-dashed border-black pb-2 mb-3">
+            <div className="flex justify-between">
+              <span>SUBTOTAL:</span>
+              <span>₦{printingOrder.subtotal}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>DELIVERY CHARGE:</span>
+              <span>₦{printingOrder.deliveryFee}</span>
+            </div>
+            <div className="flex justify-between font-bold text-sm border-t border-dashed border-black pt-1 mt-1">
+              <span>TOTAL AMT PAID:</span>
+              <span>₦{printingOrder.total}</span>
+            </div>
+          </div>
+
+          <div className="text-center text-[10px] mt-4 space-y-1">
+            <p className="font-bold uppercase tracking-widest">** KITCHEN COOK COPY **</p>
+            <p className="font-bold">Prepare meals with absolute hygiene, love, and speed!</p>
+            <p className="text-[8px] text-zinc-650">Printed via Campus Foods Hub Engine • Thank you</p>
+          </div>
+        </div>
+      )}
 
     </div>
   );
