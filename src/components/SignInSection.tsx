@@ -48,7 +48,6 @@ export default function SignInSection({
               onChange={(e) => setSigninPassword(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:border-amber-500 transition font-sans" 
             />
-            <p className="text-[11px] text-slate-400 font-bold mt-1 text-right">Demo Password info: "password123" (regular) or "admin123" (admin)</p>
           </div>
 
           <button 

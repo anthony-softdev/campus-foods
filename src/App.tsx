@@ -35,15 +35,6 @@ const INITIAL_USERS: User[] = [
     phone: "08037667982",
     password: "admin123",
     role: "admin"
-  },
-  {
-    firstname: "Jane",
-    lastname: "Doe",
-    gender: "Female",
-    email: "jane@campus.edu",
-    phone: "08011112222",
-    password: "password123",
-    role: "user"
   }
 ];
 
@@ -71,41 +62,8 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>(() => {
     const saved = localStorage.getItem('campus_orders');
     if (saved) return JSON.parse(saved);
-    
-    // Default initial order for Jane Doe
-    return [
-      {
-        orderId: "CAMPUS-821940",
-        userEmail: "jane@campus.edu",
-        userName: "Jane Doe",
-        phone: "08011112222",
-        items: [
-          {
-            cartId: "jollof-sample",
-            id: "jollof-rice",
-            name: "Jollof Rice (Special Portion)",
-            image: "https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?auto=format&fit=crop&q=80&w=600",
-            basePrice: 600,
-            extras: [
-              { label: "Plantain Portions", price: 300 },
-              { label: "Fried Chicken Drumstick", price: 800 }
-            ],
-            extrasKey: "Plantain Portions,Fried Chicken Drumstick",
-            unitPrice: 1700,
-            quantity: 1
-          }
-        ],
-        address: "Hall 3, Block B, Room 304",
-        deliveryType: "hostel",
-        ref: "TX-SAMPLE92J",
-        subtotal: 1700,
-        deliveryFee: 300,
-        total: 2000,
-        status: "Preparing",
-        timestamp: "2026-05-20, 08:35:12 AM",
-        estimatedMinutes: 26
-      }
-    ];
+
+    return [];
   });
 
   const [cart, setCart] = useState<CartItem[]>([]);
