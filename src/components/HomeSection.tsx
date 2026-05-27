@@ -311,8 +311,7 @@ export default function HomeSection({
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Your Name</label>
                   <input 
                     type="text" 
-                    required 
-                    placeholder="Anthony"
+                    required
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 transition font-sans" 
@@ -322,8 +321,7 @@ export default function HomeSection({
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Email Address</label>
                   <input 
                     type="email" 
-                    required 
-                    placeholder="tony@email.com"
+                    required
                     value={contactEmail}
                     onChange={(e) => setContactEmail(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 transition font-sans" 
@@ -335,7 +333,7 @@ export default function HomeSection({
                 <input 
                   type="text" 
                   required 
-                  placeholder="Catering for Hostel Hall 4"
+                  placeholder="Request Subject"
                   value={contactSubject}
                   onChange={(e) => setContactSubject(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 transition font-sans" 
