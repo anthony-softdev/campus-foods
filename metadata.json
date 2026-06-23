@@ -1,0 +1,6 @@
+{
+  "name": "Campus Foods",
+  "description": "Bold, colorful food ordering and delivery web application for a Nigerian university campus.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,38 @@
+type Student @table {
+  fullName: String!
+  email: String!
+  studentId: String!
+  phoneNumber: String
+  dormBuilding: String
+}
+
+type Restaurant @table {
+  name: String!
+  address: String!
+  cuisineType: String!
+  operatingHours: String
+  rating: Float
+}
+
+type MenuItem @table {
+  name: String!
+  price: Float!
+  description: String!
+  restaurant: Restaurant!
+}
+
+type Order @table {
+  status: String!
+  totalAmount: Float!
+  createdAt: Timestamp!
+  student: Student!
+  restaurant: Restaurant!
+}
+
+type OrderItem @table {
+  quantity: Int!
+  priceAtPurchase: Float!
+  specialInstructions: String
+  order: Order!
+  menuItem: MenuItem!
+}

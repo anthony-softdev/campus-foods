@@ -1,0 +1,205 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address of the user"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name"
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Full name"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "Phone number"
+        },
+        "deliveryLocation": {
+          "type": "string",
+          "description": "Hostel delivery location"
+        },
+        "roomNumber": {
+          "type": "string",
+          "description": "Room number"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["student", "admin"],
+          "description": "Role of the user"
+        }
+      },
+      "required": [
+        "email",
+        "fullName",
+        "phoneNumber",
+        "deliveryLocation",
+        "roomNumber"
+      ]
+    },
+    "MenuItem": {
+      "title": "MenuItem",
+      "description": "Available food or drink item in the cafeteria",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique key identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the dish"
+        },
+        "price": {
+          "type": "number",
+          "description": "Price in Naira"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "All",
+            "Nigerian Meals",
+            "Fast Foods",
+            "Snacks",
+            "Drinks"
+          ],
+          "description": "Food category"
+        },
+        "description": {
+          "type": "string",
+          "description": "Tasty description of the item"
+        },
+        "image": {
+          "type": "string",
+          "description": "Image URL or asset path"
+        },
+        "popular": {
+          "type": "boolean",
+          "description": "Whether the dish is popular or highlighted"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "price",
+        "category",
+        "description",
+        "image"
+      ]
+    },
+    "OrderDetails": {
+      "title": "OrderDetails",
+      "description": "Details of an order placed by a student",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique order identifier"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Customer full name"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "Customer contact phone number"
+        },
+        "deliveryLocation": {
+          "type": "string",
+          "description": "Target hostel building"
+        },
+        "roomNumber": {
+          "type": "string",
+          "description": "Room/hallway number"
+        },
+        "specialInstructions": {
+          "type": "string",
+          "description": "Custom comments or delivery instructions"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": [
+            "card",
+            "transfer",
+            "delivery"
+          ],
+          "description": "Payment mode"
+        },
+        "items": {
+          "type": "array",
+          "description": "List of cart items"
+        },
+        "subtotal": {
+          "type": "number",
+          "description": "Subtotal"
+        },
+        "deliveryFee": {
+          "type": "number",
+          "description": "Delivery fee"
+        },
+        "total": {
+          "type": "number",
+          "description": "Total amount"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Placed",
+            "Preparing",
+            "Out for Delivery",
+            "Delivered"
+          ],
+          "description": "Kitchen and delivery status"
+        },
+        "userEmail": {
+          "type": "string",
+          "description": "Registered email of ordering student"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of transaction"
+        }
+      },
+      "required": [
+        "id",
+        "fullName",
+        "phoneNumber",
+        "deliveryLocation",
+        "roomNumber",
+        "specialInstructions",
+        "paymentMethod",
+        "items",
+        "subtotal",
+        "deliveryFee",
+        "total",
+        "status",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User account registration database"
+    },
+    "/menuItems/{itemId}": {
+      "schema": "MenuItem",
+      "description": "Store items collection"
+    },
+    "/orders/{orderId}": {
+      "schema": "OrderDetails",
+      "description": "Order records store"
+    }
+  }
+}

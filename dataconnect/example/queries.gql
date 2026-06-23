@@ -1,0 +1,33 @@
+mutation CreateOrder($studentId: UUID!, $restaurantId: UUID!, $totalAmount: Float!, $status: String!) @auth(level: USER) {
+  order_insert(data: {
+    studentId: $studentId,
+    restaurantId: $restaurantId,
+    totalAmount: $totalAmount,
+    status: $status,
+    createdAt_expr: "request.time"
+  })
+}
+
+mutation UpdateOrderStatus($id: UUID!, $status: String!) @auth(level: USER) {
+  order_update(key: {id: $id}, data: {status: $status})
+}
+
+query ListStudentOrders($studentId: UUID!) @auth(level: USER) {
+  orders(where: {studentId: {eq: $studentId}}) {
+    id
+    status
+    totalAmount
+    createdAt
+    restaurant {
+      name
+    }
+  }
+}
+
+query GetRestaurantMenu($restaurantId: UUID!) @auth(level: PUBLIC) {
+  menuItems(where: {restaurantId: {eq: $restaurantId}}) {
+    name
+    price
+    description
+  }
+}
