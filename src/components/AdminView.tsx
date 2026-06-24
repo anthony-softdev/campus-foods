@@ -123,6 +123,7 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
     const prefix = category === 'Nigerian Meals' ? 'nig'
       : category === 'Fast Foods' ? 'ff'
       : category === 'Snacks' ? 'sn'
+      : category === 'Drinks' ? 'dr'
       : 'dr';
 
     const slug = name
@@ -130,9 +131,18 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
       .trim()
       .replace(/[^a-z0-9\s-]+/g, '')
       .replace(/\s+/g, '-')
-      .replace(/-+/g, '-');
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
 
-    return `${prefix}-${slug}`;
+    const id = `${prefix}-${slug}`;
+
+    // Safety: if the generated id somehow matches the old timestamp pattern
+    // (e.g. `item-123456789`) replace it with a stable slug fallback.
+    if (/^item-\d+$/.test(id)) {
+      return `${prefix}-${Date.now().toString(36)}`;
+    }
+
+    return id;
   };
 
   // Input fields for menu form (Shared between Add / Edit)
@@ -186,8 +196,9 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
     try {
       if (isAddingNew) {
         // Add to database
+        const generatedId = generateMenuItemId(formData.name.trim(), formData.category);
         const newItem: MenuItem = {
-          id: generateMenuItemId(formData.name.trim(), formData.category),
+          id: generatedId,
           name: formData.name.trim(),
           price: Number(formData.price),
           category: formData.category,
@@ -195,6 +206,10 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
           image: formData.image.trim(),
           popular: formData.popular
         };
+
+        // Log and force the id to avoid legacy timestamp IDs sneaking in
+        console.log('AdminView: saving new menu item with id=', newItem.id);
+
         await addMenuItemToDb(newItem);
         showToast('New dish added to Uni Kitchen menu successfully!', 'success');
       } else if (editingItem) {
