@@ -149,7 +149,9 @@ export async function seedMenuItemsIfEmpty(defaultItems: MenuItem[]): Promise<vo
 export async function addMenuItemToDb(item: MenuItem): Promise<void> {
   const path = `menuItems/${item.id}`;
   try {
+    console.log('addMenuItemToDb: writing to', path, 'item:', item.id);
     await setDoc(doc(db, 'menuItems', item.id), item);
+    console.log('addMenuItemToDb: write complete for', item.id);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -158,7 +160,9 @@ export async function addMenuItemToDb(item: MenuItem): Promise<void> {
 export async function deleteMenuItemFromDb(id: string): Promise<void> {
   const path = `menuItems/${id}`;
   try {
+    console.log('deleteMenuItemFromDb: deleting', path);
     await deleteDoc(doc(db, 'menuItems', id));
+    console.log('deleteMenuItemFromDb: deleted', id);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
