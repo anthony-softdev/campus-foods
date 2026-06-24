@@ -16,7 +16,6 @@ import {
   Hash, 
   Shield, 
   ChevronDown,
-  Chrome
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
@@ -1037,7 +1036,12 @@ export default function AuthView({ onAuthSuccess, onNavigate, initialTab = 'sign
                     disabled={isSubmitting}
                     className="w-full bg-white hover:bg-gray-50 text-[#1a1a1a] border-2 border-gray-200 font-bold py-4 rounded-2xl text-xs flex items-center justify-center gap-2.5 shadow-sm active:scale-[0.99] transition-all duration-200 cursor-pointer"
                   >
-                    <Chrome size={16} className="text-red-500 shrink-0" />
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                      <path fill="#4285F4" d="M23.64 12.204c0-.78-.07-1.53-.2-2.25H12v4.26h6.32c-.27 1.44-1.04 2.66-2.22 3.48v2.91h3.58c2.09-1.92 3.28-4.77 3.28-8.4z" />
+                      <path fill="#34A853" d="M12 24c2.97 0 5.47-0.98 7.29-2.65l-3.58-2.91c-.99.66-2.26 1.05-3.71 1.05-2.86 0-5.28-1.93-6.14-4.52H2.1v2.84C3.92 21.46 7.73 24 12 24z" />
+                      <path fill="#FBBC05" d="M5.86 14.97A7.99 7.99 0 0 1 5.5 12c0-1 .24-1.95.66-2.83V6.33H2.1A12.02 12.02 0 0 0 0 12c0 1.94.5 3.77 1.4 5.37l4.46-2.4z" />
+                      <path fill="#EA4335" d="M12 4.8c1.62 0 3.07.56 4.21 1.66l3.15-3.15C17.46 1.24 14.97 0 12 0 7.73 0 3.92 2.54 2.1 6.33l4.46 2.84C6.72 6.73 9.14 4.8 12 4.8z" />
+                    </svg>
                     <span>Continue with Google</span>
                   </button>
                 </form>
@@ -1599,7 +1603,12 @@ export default function AuthView({ onAuthSuccess, onNavigate, initialTab = 'sign
                   disabled={isSubmitting}
                   className="w-full bg-white hover:bg-gray-50 text-[#1a1a1a] border-2 border-gray-200 font-bold py-4 rounded-2xl text-xs flex items-center justify-center gap-2.5 shadow-sm active:scale-[0.99] transition-all duration-200 cursor-pointer"
                 >
-                  <Chrome size={16} className="text-red-500 shrink-0" />
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                    <path fill="#4285F4" d="M23.64 12.204c0-.78-.07-1.53-.2-2.25H12v4.26h6.32c-.27 1.44-1.04 2.66-2.22 3.48v2.91h3.58c2.09-1.92 3.28-4.77 3.28-8.4z" />
+                    <path fill="#34A853" d="M12 24c2.97 0 5.47-0.98 7.29-2.65l-3.58-2.91c-.99.66-2.26 1.05-3.71 1.05-2.86 0-5.28-1.93-6.14-4.52H2.1v2.84C3.92 21.46 7.73 24 12 24z" />
+                    <path fill="#FBBC05" d="M5.86 14.97A7.99 7.99 0 0 1 5.5 12c0-1 .24-1.95.66-2.83V6.33H2.1A12.02 12.02 0 0 0 0 12c0 1.94.5 3.77 1.4 5.37l4.46-2.4z" />
+                    <path fill="#EA4335" d="M12 4.8c1.62 0 3.07.56 4.21 1.66l3.15-3.15C17.46 1.24 14.97 0 12 0 7.73 0 3.92 2.54 2.1 6.33l4.46 2.84C6.72 6.73 9.14 4.8 12 4.8z" />
+                  </svg>
                   <span>Register with Google</span>
                 </button>
 
