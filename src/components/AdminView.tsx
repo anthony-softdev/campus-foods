@@ -119,6 +119,22 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
   const [menuSearch, setMenuSearch] = useState('');
   const [menuFilterCategory, setMenuFilterCategory] = useState<Category | 'All'>('All');
 
+  const generateMenuItemId = (name: string, category: Category) => {
+    const prefix = category === 'Nigerian Meals' ? 'nig'
+      : category === 'Fast Foods' ? 'ff'
+      : category === 'Snacks' ? 'sn'
+      : 'dr';
+
+    const slug = name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]+/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+
+    return `${prefix}-${slug}`;
+  };
+
   // Input fields for menu form (Shared between Add / Edit)
   const [formData, setFormData] = useState({
     name: '',
@@ -171,7 +187,7 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
       if (isAddingNew) {
         // Add to database
         const newItem: MenuItem = {
-          id: `item-${Date.now()}`,
+          id: generateMenuItemId(formData.name.trim(), formData.category),
           name: formData.name.trim(),
           price: Number(formData.price),
           category: formData.category,
