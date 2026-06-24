@@ -3,11 +3,14 @@ export type Category = 'All' | 'Nigerian Meals' | 'Fast Foods' | 'Snacks' | 'Dri
 export interface MenuCustomizationChoice {
   value: string | number;
   label: string;
+  price?: number; // additional price for this choice (per unit)
 }
 
 export interface MenuCustomizationOption {
   id: string;
   label: string;
+  // mode: 'choice' shows a select; 'quantity' shows +/- numeric selector (price applies per unit)
+  mode?: 'choice' | 'quantity';
   choices: MenuCustomizationChoice[];
 }
 

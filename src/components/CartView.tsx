@@ -93,7 +93,21 @@ export default function CartView({
   const deliveryFee = 300; // Flat fee ₦300
 
   const subtotal = useMemo(() => {
-    return cart.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
+    const customizationExtra = (ci: CartItem) => {
+      if (!ci.customizations || !ci.item.customOptions) return 0;
+      return ci.item.customOptions.reduce((sum, opt) => {
+        const val = ci.customizations ? ci.customizations[opt.id] : undefined;
+        if (opt.mode === 'quantity') {
+          const unitPrice = opt.choices[0]?.price ?? 0;
+          return sum + (Number(val) || 0) * unitPrice;
+        }
+        // choice mode
+        const choice = opt.choices.find(c => c.value === val);
+        return sum + (choice?.price ?? 0);
+      }, 0);
+    };
+
+    return cart.reduce((acc, curr) => acc + (curr.item.price + customizationExtra(curr)) * curr.quantity, 0);
   }, [cart]);
 
   const discount = useMemo(() => {
@@ -292,7 +306,21 @@ export default function CartView({
 
               <div className="divide-y divide-orange-50">
                 {cart.map((cartItem) => {
-                  const itemTotal = cartItem.item.price * cartItem.quantity;
+                  const customizationExtra = (ci: CartItem) => {
+                    if (!ci.customizations || !ci.item.customOptions) return 0;
+                    return ci.item.customOptions.reduce((sum, opt) => {
+                      const val = ci.customizations ? ci.customizations[opt.id] : undefined;
+                      if (opt.mode === 'quantity') {
+                        const unitPrice = opt.choices[0]?.price ?? 0;
+                        return sum + (Number(val) || 0) * unitPrice;
+                      }
+                      const choice = opt.choices.find(c => c.value === val);
+                      return sum + (choice?.price ?? 0);
+                    }, 0);
+                  };
+
+                  const perUnit = cartItem.item.price + customizationExtra(cartItem);
+                  const itemTotal = perUnit * cartItem.quantity;
                   return (
                     <div key={cartItem.cartId} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 animate-fadeIn">
                       

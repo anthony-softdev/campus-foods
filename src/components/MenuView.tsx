@@ -64,7 +64,12 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
     setCustomizations((prev) => {
       if (prev[item.id]) return prev;
       const defaults = item.customOptions.reduce((result, option) => {
-        result[option.id] = option.choices[0]?.value ?? '';
+        if (option.mode === 'quantity') {
+          // quantity options default to 0 units
+          result[option.id] = 0;
+        } else {
+          result[option.id] = option.choices[0]?.value ?? '';
+        }
         return result;
       }, {} as Record<string, string | number>);
       return { ...prev, [item.id]: defaults };
@@ -230,15 +235,38 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
                             {item.customOptions.map((option) => (
                               <div key={option.id} className="space-y-1">
                                 <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider">{option.label}</label>
-                                <select
-                                  value={customizations[item.id][option.id] as string}
-                                  onChange={(e) => updateCustomizationValue(item.id, option.id, e.target.value)}
-                                  className="w-full bg-white border border-orange-100 rounded-2xl px-3 py-2 text-sm text-[#1a1a1a] focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none transition-all"
-                                >
-                                  {option.choices.map((choice) => (
-                                    <option key={choice.value.toString()} value={choice.value}>{choice.label}</option>
-                                  ))}
-                                </select>
+                                {option.mode === 'quantity' ? (
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const current = (customizations[item.id]?.[option.id] as number) || 0;
+                                        if (current > 0) updateCustomizationValue(item.id, option.id, current - 1);
+                                      }}
+                                      className="px-3 py-1 border rounded-lg bg-white"
+                                    >-</button>
+                                    <div className="px-3 py-1 bg-white border rounded-lg min-w-[40px] text-center">{customizations[item.id][option.id]}</div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const current = (customizations[item.id]?.[option.id] as number) || 0;
+                                        updateCustomizationValue(item.id, option.id, current + 1);
+                                      }}
+                                      className="px-3 py-1 border rounded-lg bg-white"
+                                    >+</button>
+                                    <div className="text-xs text-gray-500 ml-2">(₦{option.choices[0]?.price ?? 0} per)</div>
+                                  </div>
+                                ) : (
+                                  <select
+                                    value={customizations[item.id][option.id] as string}
+                                    onChange={(e) => updateCustomizationValue(item.id, option.id, e.target.value)}
+                                    className="w-full bg-white border border-orange-100 rounded-2xl px-3 py-2 text-sm text-[#1a1a1a] focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none transition-all"
+                                  >
+                                    {option.choices.map((choice) => (
+                                      <option key={choice.value.toString()} value={choice.value}>{choice.label}</option>
+                                    ))}
+                                  </select>
+                                )}
                               </div>
                             ))}
 

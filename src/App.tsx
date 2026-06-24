@@ -11,8 +11,7 @@ import AuthView from './components/AuthView';
 import DashboardView from './components/DashboardView';
 import AdminView from './components/AdminView';
 import { CartItem, MenuItem, ViewType, UserProfile, OrderDetails } from './types';
-import { MENU_ITEMS } from './data/menu';
-import { listenMenuItemsFromDb, seedMenuItemsIfEmpty, listenUserOrdersFromDb } from './firebase';
+import { listenMenuItemsFromDb, listenUserOrdersFromDb } from './firebase';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<ViewType>('home');
@@ -54,17 +53,11 @@ export default function App() {
   };
 
   // Load dynamic menu items with real-time database listener and seeder
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
   useEffect(() => {
-    seedMenuItemsIfEmpty(MENU_ITEMS).catch((err) => {
-      console.error('Error seeding menu items database:', err);
-    });
-
     const unsubscribe = listenMenuItemsFromDb((items) => {
-      if (items.length > 0) {
-        setMenuItems(items);
-      }
+      setMenuItems(items || []);
     });
 
     return () => unsubscribe();

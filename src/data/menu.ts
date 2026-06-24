@@ -14,18 +14,29 @@ export const MENU_ITEMS: MenuItem[] = [
       {
         id: 'proteinType',
         label: 'Protein Option',
+        mode: 'choice',
         choices: [
-          { value: 'chicken', label: 'Chicken' },
-          { value: 'beef', label: 'Beef' },
-          { value: 'turkey', label: 'Turkey' }
+          { value: 'chicken', label: 'Chicken', price: 0 },
+          { value: 'beef', label: 'Beef', price: 250 },
+          { value: 'turkey', label: 'Turkey', price: 350 }
         ]
       },
       {
         id: 'proteinAmount',
         label: 'Extra Protein',
+        mode: 'quantity',
         choices: [
-          { value: 'regular', label: 'Regular' },
-          { value: 'extra', label: 'Extra' }
+          { value: 'portion', label: 'Extra Portion', price: 300 }
+        ]
+      }
+      ,
+      {
+        id: 'side',
+        label: 'Side Option',
+        mode: 'choice',
+        choices: [
+          { value: 'plantain', label: 'Plantain', price: 200 },
+          { value: 'none', label: 'No Side', price: 0 }
         ]
       }
     ]
@@ -42,18 +53,29 @@ export const MENU_ITEMS: MenuItem[] = [
       {
         id: 'proteinType',
         label: 'Protein Option',
+        mode: 'choice',
         choices: [
-          { value: 'chicken', label: 'Chicken' },
-          { value: 'beef', label: 'Beef' },
-          { value: 'turkey', label: 'Turkey' }
+          { value: 'chicken', label: 'Chicken', price: 0 },
+          { value: 'beef', label: 'Beef', price: 250 },
+          { value: 'turkey', label: 'Turkey', price: 350 }
         ]
       },
       {
         id: 'proteinAmount',
         label: 'Extra Protein',
+        mode: 'quantity',
         choices: [
-          { value: 'regular', label: 'Regular' },
-          { value: 'extra', label: 'Extra' }
+          { value: 'portion', label: 'Extra Portion', price: 300 }
+        ]
+      }
+      ,
+      {
+        id: 'side',
+        label: 'Side Option',
+        mode: 'choice',
+        choices: [
+          { value: 'plantain', label: 'Plantain', price: 200 },
+          { value: 'none', label: 'No Side', price: 0 }
         ]
       }
     ]
@@ -202,18 +224,19 @@ export const MENU_ITEMS: MenuItem[] = [
       {
         id: 'eggType',
         label: 'Egg Type',
+        mode: 'choice',
         choices: [
-          { value: 'fried', label: 'Fried Egg' },
-          { value: 'boiled', label: 'Boiled Egg' },
-          { value: 'none', label: 'No Egg' }
+          { value: 'fried', label: 'Fried Egg', price: 100 },
+          { value: 'boiled', label: 'Boiled Egg', price: 100 },
+          { value: 'none', label: 'No Egg', price: 0 }
         ]
       },
       {
         id: 'eggAmount',
         label: 'Egg Amount',
+        mode: 'quantity',
         choices: [
-          { value: 'one', label: '1 Egg' },
-          { value: 'two', label: '2 Eggs' }
+          { value: 'egg', label: 'Per Egg', price: 100 }
         ]
       }
     ]
