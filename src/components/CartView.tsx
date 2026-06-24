@@ -6,8 +6,8 @@ import { HOSTELLOCATIONS } from '../data/menu';
 
 interface CartViewProps {
   cart: CartItem[];
-  onUpdateCartQuantity: (itemId: string, dQuantity: number) => void;
-  onRemoveFromCart: (itemId: string) => void;
+  onUpdateCartQuantity: (cartItemId: string, dQuantity: number) => void;
+  onRemoveFromCart: (cartItemId: string) => void;
   onClearCart: () => void;
   onNavigate: (view: ViewType) => void;
   currentUser: UserProfile | null;
@@ -294,7 +294,7 @@ export default function CartView({
                 {cart.map((cartItem) => {
                   const itemTotal = cartItem.item.price * cartItem.quantity;
                   return (
-                    <div key={cartItem.item.id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 animate-fadeIn">
+                    <div key={cartItem.cartId} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 animate-fadeIn">
                       
                       {/* Product details (Image + Name + unit price) */}
                       <div className="flex items-center gap-3.5 flex-1 min-w-0">
@@ -307,6 +307,15 @@ export default function CartView({
                           <h3 className="font-display font-bold text-sm text-brand-dark leading-snug break-words">
                             {cartItem.item.name}
                           </h3>
+                          {cartItem.customizations && (
+                            <div className="mt-1 text-[11px] text-gray-500 space-y-1">
+                              {Object.entries(cartItem.customizations).map(([key, value]) => (
+                                <p key={key} className="leading-snug capitalize">
+                                  {key.replace(/([A-Z])/g, ' $1')}: {String(value)}
+                                </p>
+                              ))}
+                            </div>
+                          )}
                           <p className="text-xs text-brand-orange font-bold mt-1">
                             ₦{cartItem.item.price.toLocaleString()} each
                           </p>
@@ -345,7 +354,7 @@ export default function CartView({
 
                         {/* Trash action */}
                         <button
-                          onClick={() => onRemoveFromCart(cartItem.item.id)}
+                          onClick={() => onRemoveFromCart(cartItem.cartId)}
                           className="p-2 text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50 transition-colors cursor-pointer"
                           title="Remove item"
                         >

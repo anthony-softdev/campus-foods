@@ -5,7 +5,7 @@ import { getCartQuantity } from '../utils/cart';
 
 interface MenuViewProps {
   cart: CartItem[];
-  onAddToCart: (item: MenuItem) => void;
+  onAddToCart: (item: MenuItem, customizations?: Record<string, string | number>) => void;
   onUpdateCartQuantity: (itemId: string, dQuantity: number) => void;
   onNavigate: (view: ViewType) => void;
   menuItems: MenuItem[];
@@ -16,6 +16,7 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
   const [searchQuery, setSearchQuery] = useState('');
   const [addingId, setAddingId] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [customizations, setCustomizations] = useState<Record<string, Record<string, string | number>>>({});
 
   const categories: Category[] = ['All', 'Nigerian Meals', 'Fast Foods', 'Snacks', 'Drinks'];
 
@@ -58,10 +59,41 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
     return cart.reduce((acc, current) => acc + (current.item.price * current.quantity), 0);
   }, [cart]);
 
-  // Find a popular drink add-on to pair with meals
-  const recommendedPairingDrink = useMemo(() => {
-    return menuItems.find(item => item.id === 'dr-zobo' || (item.category === 'Drinks' && item.price < 500)) || menuItems.find(item => item.category === 'Drinks');
-  }, [menuItems]);
+  const initializeCustomization = (item: MenuItem) => {
+    if (!item.customOptions) return;
+    setCustomizations((prev) => {
+      if (prev[item.id]) return prev;
+      const defaults = item.customOptions.reduce((result, option) => {
+        result[option.id] = option.choices[0]?.value ?? '';
+        return result;
+      }, {} as Record<string, string | number>);
+      return { ...prev, [item.id]: defaults };
+    });
+  };
+
+  const updateCustomizationValue = (itemId: string, optionId: string, value: string | number) => {
+    setCustomizations((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        [optionId]: value,
+      },
+    }));
+  };
+
+  const clearCustomization = (itemId: string) => {
+    setCustomizations((prev) => {
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+  };
+
+  const handleAddCustomizedItem = (item: MenuItem) => {
+    const customization = customizations[item.id];
+    onAddToCart(item, customization);
+    clearCustomization(item.id);
+  };
 
   return (
     <div className="pt-24 pb-24 space-y-8 animate-fadeIn max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
@@ -177,32 +209,57 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
                       {item.description}
                     </p>
 
-                    {/* Highly Polished "Frequently Bought Together" Pairing Add-on widget */}
-                    {recommendedPairingDrink && (item.category === 'Nigerian Meals' || item.category === 'Fast Foods') && (
-                      <div className="bg-orange-50/50 rounded-xl p-2.5 border border-orange-100/50 flex items-center justify-between gap-1.5 mt-2 shadow-xs transition-colors hover:bg-orange-50/85">
-                        <div className="min-w-0">
-                          <span className="block text-[8px] font-bold tracking-wider text-brand-orange uppercase leading-none mb-0.5">FREQUENTLY BOUGHT WITH</span>
-                          <span className="block text-[10px] font-extrabold text-[#1a1a1a] truncate" title={recommendedPairingDrink.name}>🥤 {recommendedPairingDrink.name}</span>
+                    {item.customOptions && (
+                      <div className="bg-orange-50/60 rounded-3xl p-3 border border-orange-100/70 mt-3 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <span className="block text-[8px] font-bold tracking-wider text-brand-orange uppercase leading-none">CUSTOMIZE THIS DISH</span>
+                            <p className="text-[10px] text-gray-500 mt-1">Select your preferred protein and portion or egg preparation.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => initializeCustomization(item)}
+                            className="px-3 py-2 text-[10px] font-bold uppercase rounded-2xl bg-white border border-orange-200 text-brand-orange hover:bg-orange-100 transition-colors"
+                          >
+                            Customize
+                          </button>
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onAddToCart(recommendedPairingDrink);
-                            // Visual trigger for added state
-                            const originalText = e.currentTarget.innerText;
-                            e.currentTarget.innerText = "✓ Added!";
-                            e.currentTarget.className = "bg-emerald-500 text-white font-sans font-bold text-[9px] px-2 py-1 rounded-lg transition-transform scale-102";
-                            setTimeout(() => {
-                              if (e.currentTarget) {
-                                e.currentTarget.innerText = originalText;
-                                e.currentTarget.className = "bg-white hover:bg-orange-100 text-brand-orange border border-orange-200 text-[9px] font-bold px-2 py-1 rounded-lg transition-transform active:scale-95 cursor-pointer";
-                              }
-                            }, 1000);
-                          }}
-                          className="bg-white hover:bg-orange-100 text-brand-orange border border-orange-200 text-[9px] font-bold px-2 py-1 rounded-lg transition-transform active:scale-95 cursor-pointer"
-                        >
-                          + Add Pair
-                        </button>
+
+                        {customizations[item.id] && (
+                          <div className="space-y-3 pt-2">
+                            {item.customOptions.map((option) => (
+                              <div key={option.id} className="space-y-1">
+                                <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider">{option.label}</label>
+                                <select
+                                  value={customizations[item.id][option.id] as string}
+                                  onChange={(e) => updateCustomizationValue(item.id, option.id, e.target.value)}
+                                  className="w-full bg-white border border-orange-100 rounded-2xl px-3 py-2 text-sm text-[#1a1a1a] focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none transition-all"
+                                >
+                                  {option.choices.map((choice) => (
+                                    <option key={choice.value.toString()} value={choice.value}>{choice.label}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            ))}
+
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleAddCustomizedItem(item)}
+                                className="px-4 py-2 text-xs font-bold rounded-2xl bg-brand-orange text-white hover:bg-[#e07f00] transition-colors"
+                              >
+                                Add Customized Meal
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => clearCustomization(item.id)}
+                                className="px-4 py-2 text-xs font-bold rounded-2xl bg-white border border-orange-200 text-brand-orange hover:bg-orange-50 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

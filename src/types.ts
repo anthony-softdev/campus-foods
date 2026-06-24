@@ -1,5 +1,18 @@
 export type Category = 'All' | 'Nigerian Meals' | 'Fast Foods' | 'Snacks' | 'Drinks';
 
+export interface MenuCustomizationChoice {
+  value: string | number;
+  label: string;
+}
+
+export interface MenuCustomizationOption {
+  id: string;
+  label: string;
+  choices: MenuCustomizationChoice[];
+}
+
+export type MenuItemCustomizations = Record<string, string | number>;
+
 export interface MenuItem {
   id: string;
   name: string;
@@ -8,11 +21,14 @@ export interface MenuItem {
   description: string;
   image: string;
   popular?: boolean;
+  customOptions?: MenuCustomizationOption[];
 }
 
 export interface CartItem {
+  cartId: string;
   item: MenuItem;
   quantity: number;
+  customizations?: MenuItemCustomizations;
 }
 
 export type PaymentMethod = 'card' | 'transfer' | 'delivery';

@@ -9,7 +9,26 @@ export const MENU_ITEMS: MenuItem[] = [
     category: 'Nigerian Meals',
     description: 'Rich, smoky legendary Nigerian Jollof rice, served with tender grilled or fried chicken and sweet plantain dodo.',
     image: 'https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=600&auto=format&fit=crop&q=80',
-    popular: true
+    popular: true,
+    customOptions: [
+      {
+        id: 'proteinType',
+        label: 'Protein Option',
+        choices: [
+          { value: 'chicken', label: 'Chicken' },
+          { value: 'beef', label: 'Beef' },
+          { value: 'turkey', label: 'Turkey' }
+        ]
+      },
+      {
+        id: 'proteinAmount',
+        label: 'Extra Protein',
+        choices: [
+          { value: 'regular', label: 'Regular' },
+          { value: 'extra', label: 'Extra' }
+        ]
+      }
+    ]
   },
   {
     id: 'nig-friedrice',
@@ -18,7 +37,26 @@ export const MENU_ITEMS: MenuItem[] = [
     category: 'Nigerian Meals',
     description: 'Fragrant and colourful fried rice stir-fried with vegetables, served with delicious chicken and fried plantain.',
     image: 'https://images.unsplash.com/photo-1603133872878-6966588aaae0?w=600&auto=format&fit=crop&q=80',
-    popular: true
+    popular: true,
+    customOptions: [
+      {
+        id: 'proteinType',
+        label: 'Protein Option',
+        choices: [
+          { value: 'chicken', label: 'Chicken' },
+          { value: 'beef', label: 'Beef' },
+          { value: 'turkey', label: 'Turkey' }
+        ]
+      },
+      {
+        id: 'proteinAmount',
+        label: 'Extra Protein',
+        choices: [
+          { value: 'regular', label: 'Regular' },
+          { value: 'extra', label: 'Extra' }
+        ]
+      }
+    ]
   },
   {
     id: 'nig-egusi',
@@ -159,7 +197,26 @@ export const MENU_ITEMS: MenuItem[] = [
     category: 'Fast Foods',
     description: 'The national food of Nigerian students: instant noodles stir-fried with carrots, green beans, onions and fried/boiled egg.',
     image: 'https://images.unsplash.com/photo-1582979512210-99b6a53386f9?w=600&auto=format&fit=crop&q=80',
-    popular: true
+    popular: true,
+    customOptions: [
+      {
+        id: 'eggType',
+        label: 'Egg Type',
+        choices: [
+          { value: 'fried', label: 'Fried Egg' },
+          { value: 'boiled', label: 'Boiled Egg' },
+          { value: 'none', label: 'No Egg' }
+        ]
+      },
+      {
+        id: 'eggAmount',
+        label: 'Egg Amount',
+        choices: [
+          { value: 'one', label: '1 Egg' },
+          { value: 'two', label: '2 Eggs' }
+        ]
+      }
+    ]
   },
   {
     id: 'ff-gizzard',

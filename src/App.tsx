@@ -74,7 +74,16 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const stored = localStorage.getItem('campus_foods_cart');
-      return stored ? JSON.parse(stored) : [];
+      const parsed = stored ? JSON.parse(stored) : [];
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed.map((ci: any) => ({
+        cartId: ci.cartId ?? `${ci.item.id}|${JSON.stringify(ci.customizations ?? {})}`,
+        item: ci.item,
+        quantity: ci.quantity,
+        customizations: ci.customizations,
+      }));
     } catch (e) {
       console.error('Error parsing cart from localStorage:', e);
       return [];
@@ -147,24 +156,38 @@ export default function App() {
   }, [currentView]);
 
   // Handle adding an item to the cart
-  const handleAddToCart = (item: MenuItem) => {
+  const handleAddToCart = (item: MenuItem, customizations?: Record<string, string | number>) => {
+    const sanitizedCustomizations = customizations && Object.keys(customizations).length ? customizations : undefined;
+    const cartId = `${item.id}|${JSON.stringify(sanitizedCustomizations ?? {})}`;
+
     setCart((prevCart) => {
-      const existing = prevCart.find((ci) => ci.item.id === item.id);
+      const existing = prevCart.find((ci) => ci.cartId === cartId);
       if (existing) {
         return prevCart.map((ci) =>
-          ci.item.id === item.id ? { ...ci, quantity: ci.quantity + 1 } : ci
+          ci.cartId === cartId ? { ...ci, quantity: ci.quantity + 1 } : ci
         );
       }
-      return [...prevCart, { item, quantity: 1 }];
+      return [...prevCart, { cartId, item, quantity: 1, customizations: sanitizedCustomizations }];
     });
   };
 
   // Handle updating quantity +/-
-  const handleUpdateCartQuantity = (itemId: string, dQuantity: number) => {
+  const handleUpdateCartQuantity = (cartItemId: string, dQuantity: number) => {
     setCart((prevCart) => {
+      const exactMatch = prevCart.find((ci) => ci.cartId === cartItemId);
+      if (exactMatch) {
+        return prevCart
+          .map((ci) => {
+            if (ci.cartId === cartItemId) {
+              return { ...ci, quantity: ci.quantity + dQuantity };
+            }
+            return ci;
+          })
+          .filter((ci) => ci.quantity > 0);
+      }
       return prevCart
         .map((ci) => {
-          if (ci.item.id === itemId) {
+          if (ci.item.id === cartItemId) {
             return { ...ci, quantity: ci.quantity + dQuantity };
           }
           return ci;
@@ -174,8 +197,8 @@ export default function App() {
   };
 
   // Handle removing straight from cart
-  const handleRemoveFromCart = (itemId: string) => {
-    setCart((prevCart) => prevCart.filter((ci) => ci.item.id !== itemId));
+  const handleRemoveFromCart = (cartItemId: string) => {
+    setCart((prevCart) => prevCart.filter((ci) => ci.cartId !== cartItemId));
   };
 
   // Clear cart upon successful order placed
