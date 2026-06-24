@@ -1,0 +1,61 @@
+[
+  {
+    "id": "#CF-ORDER-001",
+    "fullName": "Jane Doe",
+    "phoneNumber": "08012345678",
+    "deliveryLocation": "Block A",
+    "roomNumber": "A204",
+    "specialInstructions": "Please deliver to the hostel gate if I am not in.",
+    "paymentMethod": "delivery",
+    "items": [
+      {
+        "cartId": "nig-jollof|{}",
+        "item": {
+          "id": "nig-jollof",
+          "name": "Jollof Rice + Chicken",
+          "price": 1500,
+          "category": "Nigerian Meals",
+          "description": "Rich, smoky legendary Nigerian Jollof rice, served with tender grilled or fried chicken and sweet plantain dodo.",
+          "image": "https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=600&auto=format&fit=crop&q=80",
+          "popular": true,
+          "customOptions": [
+            {
+              "id": "proteinType",
+              "label": "Protein Option",
+              "mode": "choice",
+              "choices": [
+                { "value": "chicken", "label": "Chicken", "price": 0 },
+                { "value": "beef", "label": "Beef", "price": 250 },
+                { "value": "turkey", "label": "Turkey", "price": 350 }
+              ]
+            },
+            {
+              "id": "proteinAmount",
+              "label": "Extra Protein",
+              "mode": "quantity",
+              "choices": [ { "value": "portion", "label": "Extra Portion", "price": 300 } ]
+            },
+            {
+              "id": "side",
+              "label": "Side Option",
+              "mode": "choice",
+              "choices": [ { "value": "plantain", "label": "Plantain", "price": 200 }, { "value": "none", "label": "No Side", "price": 0 } ]
+            }
+          ]
+        },
+        "quantity": 1,
+        "customizations": {
+          "proteinType": "chicken",
+          "proteinAmount": 0,
+          "side": "plantain"
+        }
+      }
+    ],
+    "subtotal": 1500,
+    "deliveryFee": 300,
+    "total": 1800,
+    "status": "Placed",
+    "userEmail": "jane.doe@example.com",
+    "createdAt": "2026-06-24T12:00:00.000Z"
+  }
+]

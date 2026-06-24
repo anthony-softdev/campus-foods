@@ -181,14 +181,14 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
 
       {/* FOOD GRID */}
       {filteredItems.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-6 lg:gap-8 items-start">
           {filteredItems.map((item) => {
             const qty = getCartQuantity(cart, item.id);
             const isCurrentlyAdding = addingId === item.id;
             return (
               <div
                 key={item.id}
-                className="bg-white border border-orange-100/60 rounded-3xl overflow-hidden hover:shadow-xl hover:shadow-orange-200/25 transition-all duration-300 hover:-translate-y-1 group flex flex-col justify-between"
+                className="self-start bg-white border border-orange-100/60 rounded-3xl overflow-hidden hover:shadow-xl hover:shadow-orange-200/25 transition-all duration-300 hover:-translate-y-1 group flex flex-col justify-between"
               >
                 {/* Image & tag */}
                 <div className="relative h-44 overflow-hidden bg-[#fff2e0]">
