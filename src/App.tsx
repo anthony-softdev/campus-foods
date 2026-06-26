@@ -178,14 +178,8 @@ export default function App() {
           })
           .filter((ci) => ci.quantity > 0);
       }
-      return prevCart
-        .map((ci) => {
-          if (ci.item.id === cartItemId) {
-            return { ...ci, quantity: ci.quantity + dQuantity };
-          }
-          return ci;
-        })
-        .filter((ci) => ci.quantity > 0);
+      // If no exact cartId match, do nothing. This prevents incorrect updates.
+      return prevCart;
     });
   };
 

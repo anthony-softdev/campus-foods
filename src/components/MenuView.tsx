@@ -1,11 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Search, SlidersHorizontal, RotateCcw, AlertCircle, ShoppingBag, Check, ArrowRight } from 'lucide-react';
 import { MenuItem, Category, CartItem, ViewType } from '../types';
-import { getCartQuantity } from '../utils/cart';
 
 interface MenuViewProps {
   cart: CartItem[];
-  onAddToCart: (item: MenuItem, customizations?: Record<string, string | number>) => void;
+  onAddToCart: (item: MenuItem, customizations?: Record<string, Record<string, number>>) => void;
   onUpdateCartQuantity: (itemId: string, dQuantity: number) => void;
   onNavigate: (view: ViewType) => void;
   menuItems: MenuItem[];
@@ -16,7 +15,7 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
   const [searchQuery, setSearchQuery] = useState('');
   const [addingId, setAddingId] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [customizations, setCustomizations] = useState<Record<string, Record<string, string | number>>>({});
+  const [customizations, setCustomizations] = useState<Record<string, Record<string, Record<string, number>>>>({});
 
   const categories: Category[] = ['All', 'Nigerian Meals', 'Fast Foods', 'Snacks', 'Drinks'];
 
@@ -47,7 +46,7 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
       const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             item.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
+      return matchesCategory && matchesSearch; // Show all items, regardless of stock status
     });
   }, [menuItems, selectedCategory, searchQuery]);
 
@@ -55,35 +54,64 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
     return cart.reduce((acc, current) => acc + current.quantity, 0);
   }, [cart]);
 
+  const customizationExtra = (ci: CartItem) => {
+    if (!ci.customizations || !ci.item.customOptions) return 0;
+  
+    let totalExtra = 0;
+    // ci.customizations is { optionId: { choiceValue: quantity } }
+    for (const optionId in ci.customizations) {
+      const selectedChoices = ci.customizations[optionId];
+      const optionDetails = ci.item.customOptions.find(opt => opt.id === optionId);
+      if (!optionDetails) continue;
+  
+      for (const choiceValue in selectedChoices) {
+        const quantity = selectedChoices[choiceValue];
+        const choiceDetails = optionDetails.choices.find(c => String(c.value) === String(choiceValue));
+        if (choiceDetails && choiceDetails.price) {
+          totalExtra += choiceDetails.price * quantity;
+        }
+      }
+    }
+    return totalExtra;
+  };
+
   const cartTotalValue = useMemo(() => {
-    return cart.reduce((acc, current) => acc + (current.item.price * current.quantity), 0);
+    return cart.reduce((acc, current) => acc + (current.item.price + customizationExtra(current)) * current.quantity, 0);
   }, [cart]);
 
   const initializeCustomization = (item: MenuItem) => {
     if (!item.customOptions) return;
     setCustomizations((prev) => {
-      if (prev[item.id]) return prev;
-      const defaults = item.customOptions.reduce((result, option) => {
-        if (option.mode === 'quantity') {
-          // quantity options default to 0 units
-          result[option.id] = 0;
-        } else {
-          result[option.id] = option.choices[0]?.value ?? '';
-        }
-        return result;
-      }, {} as Record<string, string | number>);
-      return { ...prev, [item.id]: defaults };
+      if (prev[item.id]) return prev; // Already open
+      const itemCustomizations: Record<string, Record<string, number>> = {};
+      item.customOptions.forEach(option => {
+        itemCustomizations[option.id] = {}; // Initialize each option with an empty object for choices
+      });
+      return { ...prev, [item.id]: itemCustomizations };
     });
   };
 
-  const updateCustomizationValue = (itemId: string, optionId: string, value: string | number) => {
-    setCustomizations((prev) => ({
-      ...prev,
-      [itemId]: {
-        ...prev[itemId],
-        [optionId]: value,
-      },
-    }));
+  const updateChoiceQuantity = (itemId: string, optionId: string, choiceValue: string | number, dQuantity: number) => {
+    setCustomizations(prev => {
+      const newCustomizations = { ...prev };
+      const itemCustoms = { ...(newCustomizations[itemId] || {}) };
+      const optionCustoms = { ...(itemCustoms[optionId] || {}) };
+  
+      const currentQty = optionCustoms[String(choiceValue)] || 0;
+      let newQty = currentQty + dQuantity;
+  
+      if (newQty < 0) newQty = 0;
+  
+      if (newQty === 0) {
+        delete optionCustoms[String(choiceValue)];
+      } else {
+        optionCustoms[String(choiceValue)] = newQty;
+      }
+  
+      itemCustoms[optionId] = optionCustoms;
+      newCustomizations[itemId] = itemCustoms;
+      return newCustomizations;
+    });
   };
 
   const clearCustomization = (itemId: string) => {
@@ -95,11 +123,21 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
   };
 
   const handleAddCustomizedItem = (item: MenuItem) => {
-    const customization = customizations[item.id];
-    onAddToCart(item, customization);
+    const itemCustoms = customizations[item.id];
+    if (!itemCustoms) return;
+
+    // Filter out empty options and choices with 0 quantity before adding to cart
+    const finalCustomizations: Record<string, Record<string, number>> = {};
+    Object.entries(itemCustoms).forEach(([optionId, choices]) => {
+      const validChoices = Object.entries(choices).filter(([, qty]) => qty > 0);
+      if (validChoices.length > 0) {
+        finalCustomizations[optionId] = Object.fromEntries(validChoices);
+      }
+    });
+
+    onAddToCart(item, finalCustomizations);
     clearCustomization(item.id);
   };
-
   return (
     <div className="pt-24 pb-24 space-y-8 animate-fadeIn max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
       
@@ -183,7 +221,7 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
       {filteredItems.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-6 lg:gap-8 items-start">
           {filteredItems.map((item) => {
-            const qty = getCartQuantity(cart, item.id);
+            const cartItemsForThisMenuItem = cart.filter(ci => ci.item.id === item.id);
             const isCurrentlyAdding = addingId === item.id;
             return (
               <div
@@ -214,7 +252,7 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
                       {item.description}
                     </p>
 
-                    {item.customOptions && (
+                    {item.customOptions && item.customOptions.length > 0 && item.inStock !== false && ( // Only show custom options if in stock
                       <div className="bg-orange-50/60 rounded-3xl p-3 border border-orange-100/70 mt-3 space-y-3">
                         <div className="flex items-center justify-between gap-3">
                           <div>
@@ -232,43 +270,44 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
 
                         {customizations[item.id] && (
                           <div className="space-y-3 pt-2">
-                            {item.customOptions.map((option) => (
-                              <div key={option.id} className="space-y-1">
-                                <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider">{option.label}</label>
-                                {option.mode === 'quantity' ? (
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const current = (customizations[item.id]?.[option.id] as number) || 0;
-                                        if (current > 0) updateCustomizationValue(item.id, option.id, current - 1);
-                                      }}
-                                      className="px-3 py-1 border rounded-lg bg-white"
-                                    >-</button>
-                                    <div className="px-3 py-1 bg-white border rounded-lg min-w-[40px] text-center">{customizations[item.id][option.id]}</div>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const current = (customizations[item.id]?.[option.id] as number) || 0;
-                                        updateCustomizationValue(item.id, option.id, current + 1);
-                                      }}
-                                      className="px-3 py-1 border rounded-lg bg-white"
-                                    >+</button>
-                                    <div className="text-xs text-gray-500 ml-2">(₦{option.choices[0]?.price ?? 0} per)</div>
-                                  </div>
-                                ) : (
-                                  <select
-                                    value={customizations[item.id][option.id] as string}
-                                    onChange={(e) => updateCustomizationValue(item.id, option.id, e.target.value)}
-                                    className="w-full bg-white border border-orange-100 rounded-2xl px-3 py-2 text-sm text-[#1a1a1a] focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none transition-all"
-                                  >
-                                    {option.choices.map((choice) => (
-                                      <option key={choice.value.toString()} value={choice.value}>{choice.label}</option>
-                                    ))}
-                                  </select>
-                                )}
-                              </div>
-                            ))}
+                            {item.customOptions.map((option) => {
+                              const choices = option.choices;
+                              return (
+                                <div key={option.id} className="space-y-2">
+                                  <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider">{option.label}</label>
+                                  {choices.map(choice => {
+                                    const qty = customizations[item.id]?.[option.id]?.[String(choice.value)] || 0;
+                                    return (
+                                      <div key={String(choice.value)} className="flex items-center justify-between gap-2 bg-white/50 p-2 rounded-xl">
+                                        <div className="text-xs font-semibold text-gray-800">
+                                          {choice.label}
+                                          {choice.price > 0 && <span className="text-gray-500 ml-1">(+₦{choice.price.toLocaleString()})</span>}
+                                        </div>
+                                        <div className="flex items-center bg-white border border-orange-100/50 rounded-xl p-1 shrink-0">
+                                          <button
+                                            type="button"
+                                            onClick={() => updateChoiceQuantity(item.id, option.id, choice.value, -1)}
+                                            className="w-6 h-6 rounded-lg bg-orange-50 text-gray-600 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
+                                          >
+                                            -
+                                          </button>
+                                          <span className="px-3 text-xs font-bold font-sans text-brand-dark min-w-[20px] text-center">
+                                            {qty}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => updateChoiceQuantity(item.id, option.id, choice.value, 1)}
+                                            className="w-6 h-6 rounded-lg bg-orange-50 text-gray-600 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
 
                             <div className="flex flex-wrap gap-2">
                               <button
@@ -293,47 +332,85 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
                   </div>
 
                   {/* Pricing and cart controls */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 mt-4 border-t border-orange-50">
-                    <div>
-                      <span className="text-[9px] uppercase tracking-wider text-gray-400 font-bold block">PRICE</span>
-                      <span className="text-base font-display font-extrabold text-[#1a1a1a]">₦{item.price.toLocaleString()}</span>
+                  <div className="flex flex-col gap-3 pt-3 mt-4 border-t border-orange-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[9px] uppercase tracking-wider text-gray-400 font-bold block">PRICE</span>
+                        <span className="text-base font-display font-extrabold text-[#1a1a1a]">₦{item.price.toLocaleString()}</span>
+                      </div>
+
+                      {item.inStock !== false ? (
+                        // If there are no versions of this item in the cart, show the "Add to Cart" button
+                        cartItemsForThisMenuItem.length === 0 && (
+                          <button
+                            onClick={() => {
+                              onAddToCart(item);
+                              setAddingId(item.id);
+                              setTimeout(() => setAddingId(null), 1000);
+                            }}
+                            className={`py-2 px-4 text-xs font-bold rounded-xl transition-all duration-300 cursor-pointer shadow-md inline-flex items-center justify-center gap-1.5 focus:outline-none ${
+                              isCurrentlyAdding
+                                ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-200 scale-102 flex'
+                                : 'bg-brand-orange hover:bg-[#e07f00] text-white shadow-orange-200 hover:scale-105'
+                            }`}
+                          >
+                            {isCurrentlyAdding ? <Check size={13} className="stroke-[3] animate-bounce" /> : <ShoppingBag size={13} />}
+                            {isCurrentlyAdding ? 'Added! ✓' : 'Add to Cart'}
+                          </button>
+                        )
+                      ) : (
+                        <button
+                          disabled
+                          className="py-2 px-4 text-xs font-bold rounded-xl bg-gray-200 text-gray-500 cursor-not-allowed shadow-md inline-flex items-center justify-center gap-1.5"
+                        >
+                          <AlertCircle size={13} /> Out of Stock
+                        </button>
+                      )}
                     </div>
 
-                    {/* +/- selection state */}
-                    {qty > 0 ? (
-                      <div className="flex items-center justify-between bg-orange-50 border border-orange-100 rounded-2xl py-1 px-2.5">
-                        <button
-                          onClick={() => onUpdateCartQuantity(item.id, -1)}
-                          className="w-5.5 h-5.5 rounded-lg bg-white text-brand-orange hover:bg-brand-orange hover:text-white flex items-center justify-center font-bold text-xs transition-colors cursor-pointer select-none"
-                        >
-                          -
-                        </button>
-                        <span className="px-2 text-xs font-bold font-sans text-brand-orange">
-                          {qty}
-                        </span>
-                        <button
-                          onClick={() => onUpdateCartQuantity(item.id, 1)}
-                          className="w-5.5 h-5.5 rounded-lg bg-white text-brand-orange hover:bg-brand-orange hover:text-white flex items-center justify-center font-bold text-xs transition-colors cursor-pointer select-none"
-                        >
-                          +
-                        </button>
+                    {/* If there are items in the cart, list them with their controls */}
+                    {cartItemsForThisMenuItem.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-dashed border-orange-100">
+                        {cartItemsForThisMenuItem.map(cartItem => {
+                          const customizationDetails = cartItem.customizations && Object.keys(cartItem.customizations).length > 0 ?
+                            Object.entries(cartItem.customizations).flatMap(([optionId, choices]) => {
+                              const option = item.customOptions?.find(o => o.id === optionId);
+                              return Object.entries(choices).map(([choiceValue, quantity]) => {
+                                if (quantity === 0) return null;
+                                const choice = option?.choices.find(c => String(c.value) === String(choiceValue));
+                                const choiceLabel = choice ? choice.label : String(choiceValue);
+                                return (
+                                  <li key={`${optionId}-${choiceValue}`} className="text-gray-500 capitalize text-[10px] list-none ml-0">
+                                    {quantity > 1 ? `${quantity}x ` : ''}{choiceLabel}
+                                  </li>
+                                );
+                              });
+                            }).filter(Boolean)
+                          : null;
+
+                          return (
+                            <div key={cartItem.cartId} className="flex items-center justify-between gap-2">
+                              <div className="text-xs">
+                                <p className="font-bold text-gray-800">
+                                  {customizationDetails && customizationDetails.length > 0 ? 'Customized' : 'Standard'}
+                                </p>
+                                <ul className="space-y-0.5">{customizationDetails}</ul>
+                              </div>
+                              <div className="flex items-center justify-between bg-orange-50 border border-orange-100 rounded-2xl py-1 px-2.5">
+                                <button
+                                  onClick={() => onUpdateCartQuantity(cartItem.cartId, -1)}
+                                  className="w-5.5 h-5.5 rounded-lg bg-white text-brand-orange hover:bg-brand-orange hover:text-white flex items-center justify-center font-bold text-xs transition-colors cursor-pointer select-none"
+                                >-</button>
+                                <span className="px-2 text-xs font-bold font-sans text-brand-orange">{cartItem.quantity}</span>
+                                <button
+                                  onClick={() => onUpdateCartQuantity(cartItem.cartId, 1)}
+                                  className="w-5.5 h-5.5 rounded-lg bg-white text-brand-orange hover:bg-brand-orange hover:text-white flex items-center justify-center font-bold text-xs transition-colors cursor-pointer select-none"
+                                >+</button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          onAddToCart(item);
-                          setAddingId(item.id);
-                          setTimeout(() => setAddingId(null), 1000);
-                        }}
-                        className={`py-2 px-4 text-xs font-bold rounded-xl transition-all duration-300 cursor-pointer shadow-md inline-flex items-center justify-center gap-1.5 focus:outline-none ${
-                          isCurrentlyAdding
-                            ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-200 scale-102 flex'
-                            : 'bg-brand-orange hover:bg-[#e07f00] text-white shadow-orange-200 hover:scale-105'
-                        }`}
-                      >
-                        {isCurrentlyAdding ? <Check size={13} className="stroke-[3] animate-bounce" /> : <ShoppingBag size={13} />}
-                        {isCurrentlyAdding ? 'Added! ✓' : 'Add to Cart'}
-                      </button>
                     )}
                   </div>
                 </div>

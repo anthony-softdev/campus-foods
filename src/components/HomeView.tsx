@@ -26,10 +26,12 @@ export default function HomeView({ onNavigate, cart, onAddToCart, onUpdateCartQu
   }, []);
 
   // Get 6-8 popular items
-  const popularItems = menuItems.filter(item => item.popular);
+  const popularItems = menuItems.filter(item => item.popular && item.inStock !== false); // Also filter by inStock
 
   const getCartQuantity = (itemId: string) => {
-    const found = cart.find(c => c.item.id === itemId);
+    // Find item without customizations. The cartId format must match what the parent expects.
+    const cartIdForSimpleItem = `${itemId}|{}`;
+    const found = cart.find(c => c.cartId === cartIdForSimpleItem);
     return found ? found.quantity : 0;
   };
 
@@ -219,6 +221,7 @@ export default function HomeView({ onNavigate, cart, onAddToCart, onUpdateCartQu
           <div className="flex overflow-x-auto pb-4 gap-6 custom-scrollbar sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:overflow-visible">
             {popularItems.slice(0, 8).map((item) => {
               const qty = getCartQuantity(item.id);
+              const cartIdForSimpleItem = `${item.id}|{}`;
               return (
                 <div 
                   key={item.id} 
@@ -259,7 +262,7 @@ export default function HomeView({ onNavigate, cart, onAddToCart, onUpdateCartQu
                       {qty > 0 ? (
                         <div className="flex items-center bg-orange-50 border border-orange-100 rounded-2xl py-1.5 px-3">
                           <button
-                            onClick={() => onUpdateCartQuantity(item.id, -1)}
+                            onClick={() => onUpdateCartQuantity(cartIdForSimpleItem, -1)}
                             className="w-6 h-6 rounded-lg bg-white text-brand-orange hover:bg-brand-orange hover:text-white flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
                           >
                             -
@@ -268,7 +271,7 @@ export default function HomeView({ onNavigate, cart, onAddToCart, onUpdateCartQu
                             {qty}
                           </span>
                           <button
-                            onClick={() => onUpdateCartQuantity(item.id, 1)}
+                            onClick={() => onUpdateCartQuantity(cartIdForSimpleItem, 1)}
                             className="w-6 h-6 rounded-lg bg-white text-brand-orange hover:bg-brand-orange hover:text-white flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
                           >
                             +

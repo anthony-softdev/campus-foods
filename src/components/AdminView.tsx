@@ -3,7 +3,7 @@ import {
   TrendingUp, ShoppingBag, Clock, CheckCircle2, Truck, 
   Search, Filter, Plus, Edit2, Trash2, RotateCcw, 
   Layers, Package, MapPin, Phone, MessageSquare, CreditCard,
-  User, Check, X, AlertCircle, Sparkles, Image as ImageIcon,
+  User, Check, X, AlertCircle, Sparkles, Image as ImageIcon, Info,
   DollarSign, ChevronRight, RefreshCw, Eye, LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -16,6 +16,22 @@ import {
   clearAllOrdersFromDb 
 } from '../firebase';
 
+// Inferred types from other components since types.ts is not provided.
+// This helps fix type errors within this file.
+interface MenuCustomizationChoice {
+  value: string | number;
+  label: string;
+  price: number;
+}
+
+type CustomOptionMode = 'choice' | 'quantity';
+
+interface MenuCustomizationOption {
+  id: string;
+  label:string;
+  mode: CustomOptionMode;
+  choices: MenuCustomizationChoice[];
+}
 interface AdminViewProps {
   menuItems: MenuItem[];
   onSetMenuItems: (items: MenuItem[]) => void;
@@ -89,27 +105,39 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
   };
 
   // Mark all active or outstanding orders as delivered
-  const handleMarkAllAsDelivered = () => {
-    const activeCount = orders.filter(o => o.status !== 'Delivered').length;
+  const handleMarkAllAsDelivered = async () => {
+    const ordersToUpdate = orders.filter(o => o.status !== 'Delivered');
+    const activeCount = ordersToUpdate.length;
     if (activeCount === 0) {
       showToast("All orders in the queue are already marked as Delivered!", 'warning');
       return;
     }
     if (window.confirm(`Mark all ${activeCount} outstanding/active orders as 'Delivered'?`)) {
-      setOrders(prev => prev.map(o => ({ ...o, status: 'Delivered' as const })));
-      showToast("All active orders have been successfully updated to 'Delivered'!", 'success');
+      try {
+        const updatePromises = ordersToUpdate.map(o => updateOrderStatusInDb(o.id, 'Delivered'));
+        await Promise.all(updatePromises);
+        showToast("All active orders have been successfully updated to 'Delivered'!", 'success');
+      } catch (err) {
+        console.error("Error marking all as delivered:", err);
+        showToast("Failed to update all orders. Please try again.", 'error');
+      }
     }
   };
 
   // Complete clean up and wipe out entire active queue history
-  const handleClearAllOrders = () => {
+  const handleClearAllOrders = async () => {
     if (orders.length === 0) {
       showToast("No order queue records found. History list is already blank.", 'warning');
       return;
     }
     if (window.confirm("Are you absolutely sure you want to CLEAR the entire order queue history? This action is irreversible!")) {
-      setOrders([]);
-      showToast("Order history directory has been completely wiped!", 'success');
+      try {
+        await clearAllOrdersFromDb();
+        showToast("Order history directory has been completely wiped!", 'success');
+      } catch (err) {
+        console.error("Error clearing all orders:", err);
+        showToast("Failed to clear order history from the database.", "error");
+      }
     }
   };
 
@@ -118,6 +146,7 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [menuSearch, setMenuSearch] = useState('');
   const [menuFilterCategory, setMenuFilterCategory] = useState<Category | 'All'>('All');
+
 
   const generateMenuItemId = (name: string, category: Category) => {
     const prefix = category === 'Nigerian Meals' ? 'nig'
@@ -152,10 +181,14 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
     category: 'Nigerian Meals' as Category,
     description: '',
     image: '',
-    popular: false
+    popular: false,
+    inStock: true, // Default to in stock
+    customOptions: [] as MenuCustomizationOption[], // Initialize empty
   });
+  const [customOptionErrors, setCustomOptionErrors] = useState<Record<number, Record<string, string>>>({});
 
   const openEditModal = (item: MenuItem) => {
+    setCustomOptionErrors({});
     setEditingItem(item);
     setFormData({
       name: item.name,
@@ -163,12 +196,15 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
       category: item.category,
       description: item.description,
       image: item.image,
-      popular: !!item.popular
+      popular: !!item.popular,
+      inStock: item.inStock !== false,
+      customOptions: item.customOptions ? JSON.parse(JSON.stringify(item.customOptions)) : [], // Deep copy to prevent direct state mutation
     });
     setIsAddingNew(false);
   };
 
   const openAddModal = () => {
+    setCustomOptionErrors({});
     setEditingItem(null);
     setFormData({
       name: '',
@@ -176,20 +212,67 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
       category: 'Nigerian Meals',
       description: '',
       image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80',
-      popular: false
+      popular: false, // Default to not popular for new items
+      inStock: true,
+      customOptions: [],
     });
     setIsAddingNew(true);
   };
 
   const closeForm = () => {
+    setCustomOptionErrors({});
     setEditingItem(null);
     setIsAddingNew(false);
   };
 
   const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Basic form validation
     if (!formData.name.trim() || !formData.description.trim() || !formData.image.trim()) {
       showToast('Please fill out all mandatory menu item details.', 'error');
+      return;
+    }
+
+    // Validate custom options
+    const currentCustomOptionErrors: Record<number, Record<string, string>> = {};
+    let hasCustomOptionErrors = false;
+
+    formData.customOptions.forEach((option, optionIndex) => {
+      const optionErrors: Record<string, string> = {};
+      if (!option.label.trim()) {
+        optionErrors.label = 'Option label is required.';
+      }
+      if (!option.id.trim()) {
+        optionErrors.id = 'Option ID is required.';
+      } else if (formData.customOptions.filter((o, i) => i !== optionIndex && o.id.trim() === option.id.trim()).length > 0) {
+        optionErrors.id = 'Option ID must be unique.';
+      }
+
+      option.choices.forEach((choice, choiceIndex) => {
+        if (!choice.label.trim()) {
+          optionErrors[`choice-${choiceIndex}-label`] = 'Choice label is required.';
+        }
+        if (choice.value === null || choice.value === undefined || choice.value.toString().trim() === '') {
+          optionErrors[`choice-${choiceIndex}-value`] = 'Choice value is required.';
+        } else if (option.choices.filter((c, i) => i !== choiceIndex && c.value === choice.value).length > 0) {
+          optionErrors[`choice-${choiceIndex}-value`] = 'Choice value must be unique.';
+        }
+        if (typeof choice.price !== 'number' || isNaN(choice.price) || choice.price < 0) {
+          optionErrors[`choice-${choiceIndex}-price`] = 'Price must be a non-negative number.';
+        }
+      });
+
+      if (Object.keys(optionErrors).length > 0) {
+        currentCustomOptionErrors[optionIndex] = optionErrors;
+        hasCustomOptionErrors = true;
+      }
+    });
+    setCustomOptionErrors(currentCustomOptionErrors); // Update state with errors
+
+    if (hasCustomOptionErrors) {
+      showToast('Please fix errors in custom options.', 'error');
+      console.error('Custom option validation errors:', currentCustomOptionErrors);
       return;
     }
 
@@ -197,33 +280,35 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
       if (isAddingNew) {
         // Add to database
         const generatedId = generateMenuItemId(formData.name.trim(), formData.category);
-        const newItem: MenuItem = {
+        const newItemData = {
           id: generatedId,
           name: formData.name.trim(),
           price: Number(formData.price),
           category: formData.category,
           description: formData.description.trim(),
           image: formData.image.trim(),
-          popular: formData.popular
+          popular: formData.popular,
+          inStock: formData.inStock,
+        };
+        const finalNewItem = {
+          ...newItemData,
+          ...(formData.customOptions.length > 0 && { customOptions: formData.customOptions })
         };
 
         // Log and force the id to avoid legacy timestamp IDs sneaking in
-        console.log('AdminView: saving new menu item with id=', newItem.id);
+        console.log('AdminView: saving new menu item with id=', finalNewItem.id);
 
-        await addMenuItemToDb(newItem);
+        await addMenuItemToDb(finalNewItem as MenuItem);
         showToast('New dish added to Uni Kitchen menu successfully!', 'success');
       } else if (editingItem) {
         // Edit to database
-        const updatedItem: MenuItem = {
-          ...editingItem,
-          name: formData.name.trim(),
-          price: Number(formData.price),
-          category: formData.category,
-          description: formData.description.trim(),
-          image: formData.image.trim(),
-          popular: formData.popular
+        const { customOptions, ...restOfItem } = editingItem; // Destructure to safely handle customOptions
+        const finalUpdatedItem = {
+          ...restOfItem,
+          ...formData,
+          ...(formData.customOptions.length > 0 && { customOptions: formData.customOptions })
         };
-        await addMenuItemToDb(updatedItem);
+        await addMenuItemToDb(finalUpdatedItem as MenuItem);
         showToast('Dish updated successfully!', 'success');
       }
     } catch (err) {
@@ -242,6 +327,110 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
         console.error('Error deleting menu item:', err);
         showToast('Error deleting item from database.', 'error');
       }
+    }
+  };
+
+  // Helper functions for managing custom options
+  const handleAddCustomOption = () => {
+    setFormData((prev) => ({
+      ...prev,
+      customOptions: [
+        ...prev.customOptions,
+        { id: '', label: '', mode: 'choice', choices: [{ value: '', label: '', price: 0 }] },
+      ],
+    }));
+  };
+
+  const handleRemoveCustomOption = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      customOptions: prev.customOptions.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleUpdateCustomOption = (
+    optionIndex: number,
+    field: keyof MenuCustomizationOption,
+    value: string | MenuCustomizationOption['mode']
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      customOptions: prev.customOptions.map((option, i) => {
+        if (i === optionIndex) { // Ensure we're updating the correct option
+          const updatedOption = { ...option, [field]: value };
+          // If mode changes to 'quantity', ensure only one choice exists
+          if (field === 'mode' && (value === 'quantity' || value === 'choice')) {
+            if (value === 'quantity') {
+              updatedOption.choices = updatedOption.choices.slice(0, 1); // Keep at most one choice
+              if (updatedOption.choices.length === 0) { // If no choices, add a default one
+                updatedOption.choices = [{ value: '', label: '', price: 0 }];
+              }
+            } else if (value === 'choice' && updatedOption.choices.length === 0) {
+              // If changing to choice mode and no choices exist, add a default one
+              updatedOption.choices = [{ value: '', label: '', price: 0 }];
+            }
+          }
+          return updatedOption;
+        }
+        return option; // Return original option if not the one being updated
+      }),
+    }));
+  };
+
+  const handleAddChoiceToOption = (optionIndex: number) => {
+    setFormData((prev) => ({
+      ...prev, // Spread previous state
+      customOptions: prev.customOptions.map((option, i) =>
+        i === optionIndex
+          ? { ...option, choices: [...option.choices, { value: '', label: '', price: 0 }] }
+          : option
+      ),
+    }));
+  };
+
+  const handleRemoveChoiceFromOption = (optionIndex: number, choiceIndex: number) => {
+    setFormData((prev) => ({
+      ...prev, // Spread previous state
+      customOptions: prev.customOptions.map((option, i) =>
+        i === optionIndex
+          ? { ...option, choices: option.choices.filter((_, j) => j !== choiceIndex) }
+          : option
+      ),
+    }));
+  };
+
+  const handleUpdateChoiceInOption = (
+    optionIndex: number,
+    choiceIndex: number,
+    field: keyof MenuCustomizationChoice,
+    value: string | number
+  ) => {
+    setFormData((prev) => ({
+      ...prev, // Spread previous state
+      customOptions: prev.customOptions.map((option, i) =>
+        i === optionIndex
+          ? {
+              ...option,
+              choices: option.choices.map((choice, j) =>
+                j === choiceIndex ? { ...choice, [field]: value } : choice
+              ),
+            }
+          : option
+        ),
+    }));
+  };
+
+  // Toggle inStock status directly from the list
+  const handleToggleInStock = async (item: MenuItem) => {
+    try {
+      const updatedItem = { ...item, inStock: !item.inStock };
+      await addMenuItemToDb(updatedItem); // Re-use addMenuItemToDb for update
+      // Update local state to reflect change immediately
+      onSetMenuItems(prev => prev.map(i => i.id === item.id ? updatedItem : i));
+      showToast(`'${item.name}' is now ${updatedItem.inStock ? 'in stock' : 'out of stock'}.`, 'success');
+    } catch (err) {
+      console.error('Error toggling inStock status:', err);
+      showToast('Failed to update stock status.', 'error');
     }
   };
 
@@ -932,6 +1121,185 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
                       </label>
                     </div>
 
+                    {/* In Stock checkbox banner */}
+                    <div className="flex items-center gap-2 font-sans py-1">
+                      <input
+                        type="checkbox"
+                        id="in-stock-toggle"
+                        checked={formData.inStock}
+                        onChange={(e) => setFormData({...formData, inStock: e.target.checked})}
+                        className="w-4 h-4 rounded border-orange-200 text-brand-orange focus:ring-brand-orange"
+                      />
+                      <label htmlFor="in-stock-toggle" className="text-xs font-bold text-gray-700 cursor-pointer select-none">
+                        Available In Stock ✅ (displays on customer menu)
+                      </label>
+                    </div>
+
+                    {/* Custom Options Section */}
+                    {/* Custom Options Section */}
+                    <div className="space-y-3 pt-4 border-t border-orange-100/50">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                          Customizable Options (e.g., Protein, Sides)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleAddCustomOption}
+                          className="px-3 py-1.5 bg-brand-orange hover:bg-[#e07f00] text-white rounded-xl text-xs font-bold flex items-center gap-1"
+                        >
+                          <Plus size={12} /> Add Option
+                        </button>
+                      </div>
+
+                      {formData.customOptions.length === 0 && (
+                        <p className="text-xs text-gray-400 italic">No custom options added yet.</p>
+                      )}
+
+                      {formData.customOptions.map((option, optionIndex) => (
+                        <div key={optionIndex} className="bg-gray-50 border border-gray-150 p-4 rounded-2xl space-y-3">
+                          <div className="flex justify-between items-center">
+                            <h4 className="text-sm font-bold text-[#1a1a1a]">Custom Option #{optionIndex + 1}</h4>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCustomOption(optionIndex)}
+                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                              title="Remove this option"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Option Label (e.g., "Protein Option") */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Option Label *</label>
+                              <input
+                                type="text"
+                                placeholder="e.g., Protein Option"
+                                value={option.label}
+                                onChange={(e) => handleUpdateCustomOption(optionIndex, 'label', e.target.value)}
+                                className="w-full bg-white text-xs p-3 rounded-xl border border-gray-200 outline-none focus:border-brand-orange"
+                                required
+                              />
+                              {/* {customOptionErrors[optionIndex]?.label && <p className="text-[10px] text-red-500">{customOptionErrors[optionIndex].label}</p>} */}
+                              {customOptionErrors[optionIndex]?.label && <p className="text-[10px] text-red-500 font-bold mt-1">⚠️ {customOptionErrors[optionIndex].label}</p>}
+                            </div>
+                            {/* Option ID (unique, internal identifier) */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Option ID (e.g., proteinType) *</label>
+                              <input
+                                type="text"
+                                placeholder="e.g., proteinType, sideChoice"
+                                value={option.id}
+                                onChange={(e) => handleUpdateCustomOption(optionIndex, 'id', e.target.value)}
+                                className="w-full bg-white text-xs p-3 rounded-xl border border-gray-200 outline-none focus:border-brand-orange"
+                                required
+                              />
+                              <p className="text-[9px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                <Info size={10} />
+                                Used for internal tracking. Must be unique per item.
+                              </p>
+                              {customOptionErrors[optionIndex]?.id && <p className="text-[10px] text-red-500 font-bold mt-1">⚠️ {customOptionErrors[optionIndex].id}</p>}
+                            </div>
+                          </div>
+
+                          {/* Option Mode (Choice or Quantity) */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Option Mode *</label>
+                            <select // Changed to select for mode
+                              value={option.mode}
+                              onChange={(e) => handleUpdateCustomOption(optionIndex, 'mode', e.target.value as CustomOptionMode)}
+                              className="w-full bg-white text-xs p-3 rounded-xl border border-gray-200 outline-none focus:border-brand-orange"
+                            >
+                              <option value="choice">Choice (e.g., Chicken, Beef)</option>
+                              <option value="quantity">Quantity (e.g., Extra Portion)</option>
+                            </select>
+                            {customOptionErrors[optionIndex]?.mode && <p className="text-[10px] text-red-500 font-bold mt-1">⚠️ {customOptionErrors[optionIndex].mode}</p>}
+                          </div>
+
+                          {/* Choices for the option */}
+                          <div className="space-y-2 pt-3 border-t border-gray-100">
+                            <div className="flex justify-between items-center">
+                              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Choices</label>
+                              {option.mode === 'choice' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddChoiceToOption(optionIndex)}
+                                  className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold flex items-center gap-1"
+                                >
+                                  <Plus size={10} /> Add Choice
+                                </button>
+                              )}
+                            </div>
+
+                            {option.choices.length === 0 && (
+                              <p className="text-xs text-gray-400 italic">No choices added for this option.</p>
+                            )}
+                            {option.mode === 'quantity' && (
+                              <p className="text-xs text-gray-400 italic flex items-center gap-1">
+                                <Info size={10} />
+                                For 'Quantity' mode, only one choice is needed (e.g., "Extra Portion").
+                              </p>
+                            )}
+
+                            {/* Render choices - only one for quantity mode */}
+                            {(option.mode === 'choice' ? option.choices : option.choices.slice(0, 1)).map((choice, choiceIndex) => (
+                              <div key={choiceIndex} className="flex items-center gap-2 bg-white border border-gray-100 p-2 rounded-lg">
+                                {/* Choice Label (e.g., "Fried Chicken") */}
+                                <div className="flex-1 space-y-0.5">
+                                  <input
+                                    type="text"
+                                    placeholder="Label (e.g., Fried Chicken)"
+                                    value={choice.label}
+                                    onChange={(e) => handleUpdateChoiceInOption(optionIndex, choiceIndex, 'label', e.target.value)}
+                                    className="w-full bg-gray-50 text-xs p-2 rounded-md border border-gray-100 outline-none focus:border-brand-orange"
+                                    required
+                                  />
+                                  {customOptionErrors[optionIndex]?.[`choice-${choiceIndex}-label`] && <p className="text-[10px] text-red-500 font-bold">⚠️ {customOptionErrors[optionIndex][`choice-${choiceIndex}-label`]}</p>}
+                                </div>
+                                {/* Choice Value (internal, e.g., "friedChicken") */}
+                                <div className="flex-1 space-y-0.5">
+                                  <input
+                                    type="text"
+                                    placeholder="Value (e.g., friedChicken)"
+                                    value={choice.value}
+                                    onChange={(e) => handleUpdateChoiceInOption(optionIndex, choiceIndex, 'value', e.target.value)}
+                                    className="w-full bg-gray-50 text-xs p-2 rounded-md border border-gray-100 outline-none focus:border-brand-orange"
+                                    required
+                                  />
+                                  {customOptionErrors[optionIndex]?.[`choice-${choiceIndex}-value`] && <p className="text-[10px] text-red-500 font-bold">⚠️ {customOptionErrors[optionIndex][`choice-${choiceIndex}-value`]}</p>}
+                                </div>
+                                {/* Choice Price (additional cost) */}
+                                <div className="w-24 space-y-0.5">
+                                  <input
+                                    type="number"
+                                    placeholder="Add. Price"
+                                    value={choice.price}
+                                    onChange={(e) => handleUpdateChoiceInOption(optionIndex, choiceIndex, 'price', Number(e.target.value))}
+                                    className="w-full bg-gray-50 text-xs p-2 rounded-md border border-gray-100 outline-none focus:border-brand-orange"
+                                    min="0"
+                                    required
+                                  />
+                                  {customOptionErrors[optionIndex]?.[`choice-${choiceIndex}-price`] && <p className="text-[10px] text-red-500 font-bold">⚠️ {customOptionErrors[optionIndex][`choice-${choiceIndex}-price`]}</p>}
+                                </div>
+                                <span className="text-xs text-gray-500 font-bold">₦</span>
+                                {option.mode === 'choice' && option.choices.length > 1 && ( // Only allow removing choices if mode is 'choice' and there's more than one
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveChoiceFromOption(optionIndex, choiceIndex)}
+                                    className="p-1 text-red-400 hover:bg-red-50 rounded-md"
+                                    title="Remove choice"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
                     <div className="flex justify-end gap-2 pt-2 border-t border-orange-100/50">
                       <button
                         type="button"
@@ -1004,6 +1372,21 @@ export default function AdminView({ menuItems, onSetMenuItems, onNavigate, curre
                       </span>
                       
                       <div className="flex items-center gap-1.5">
+                        {/* In Stock Toggle */}
+                        <button
+                          onClick={() => handleToggleInStock(item)}
+                          className={`flex items-center gap-1 px-3 py-2 border rounded-lg shadow-sm transition-colors cursor-pointer ${
+                            item.inStock !== false // Check if it's explicitly false
+                              ? 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100'
+                              : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                          }`}
+                          title={item.inStock !== false ? 'Mark as Out of Stock' : 'Mark as In Stock'}
+                        >
+                          <span className="text-xs font-semibold">In Stock?</span>
+                          {item.inStock !== false ? <Check size={12} className="shrink-0" /> : <X size={12} className="shrink-0" />}
+                        </button>
+
+                        {/* Edit Button */}
                         <button
                           onClick={() => openEditModal(item)}
                           className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-brand-orange hover:bg-orange-50 rounded-lg shadow-sm transition-colors cursor-pointer"

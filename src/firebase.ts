@@ -218,13 +218,14 @@ export async function updateOrderStatusInDb(orderId: string, status: OrderDetail
   }
 }
 
-export async function clearAllOrdersFromDb(orders: OrderDetails[]): Promise<void> {
+export async function clearAllOrdersFromDb(): Promise<void> {
   const path = 'orders';
   try {
+    const ordersCollection = collection(db, 'orders');
+    const ordersSnapshot = await getDocs(ordersCollection);
     const batch = writeBatch(db);
-    orders.forEach((o) => {
-      const orderRef = doc(db, 'orders', o.id);
-      batch.delete(orderRef);
+    ordersSnapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
     });
     await batch.commit();
   } catch (error) {
@@ -246,4 +247,3 @@ export async function saveContactMessageToDb(message: {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
-

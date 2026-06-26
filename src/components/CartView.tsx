@@ -34,9 +34,8 @@ export default function CartView({
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
   const [screenshotError, setScreenshotError] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = (file: File | undefined | null) => {
     setScreenshotError(null);
-    const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
@@ -45,20 +44,24 @@ export default function CartView({
       setScreenshotPreview(null);
       return;
     }
-
+  
     if (!file.type.startsWith('image/')) {
       setScreenshotError('Please upload an image file (PNG, JPG, JPEG).');
       setTransferScreenshot(null);
       setScreenshotPreview(null);
       return;
     }
-
+  
     setTransferScreenshot(file);
     const reader = new FileReader();
     reader.onloadend = () => {
       setScreenshotPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleFile(e.target.files?.[0]);
   };
 
   // Sync profile details if user gets logged in after entering cart
@@ -93,18 +96,25 @@ export default function CartView({
   const deliveryFee = 300; // Flat fee ₦300
 
   const subtotal = useMemo(() => {
-    const customizationExtra = (ci: CartItem) => {
+    const customizationExtra = (ci: CartItem): number => {
       if (!ci.customizations || !ci.item.customOptions) return 0;
-      return ci.item.customOptions.reduce((sum, opt) => {
-        const val = ci.customizations ? ci.customizations[opt.id] : undefined;
-        if (opt.mode === 'quantity') {
-          const unitPrice = opt.choices[0]?.price ?? 0;
-          return sum + (Number(val) || 0) * unitPrice;
+    
+      let totalExtra = 0;
+      // ci.customizations is { optionId: { choiceValue: quantity } }
+      for (const optionId in ci.customizations) {
+        const selectedChoices = ci.customizations[optionId];
+        const optionDetails = ci.item.customOptions.find(opt => opt.id === optionId);
+        if (!optionDetails) continue;
+    
+        for (const choiceValue in selectedChoices) {
+          const quantity = selectedChoices[choiceValue];
+          const choiceDetails = optionDetails.choices.find(c => String(c.value) === String(choiceValue));
+          if (choiceDetails && choiceDetails.price) {
+            totalExtra += choiceDetails.price * quantity;
+          }
         }
-        // choice mode
-        const choice = opt.choices.find(c => c.value === val);
-        return sum + (choice?.price ?? 0);
-      }, 0);
+      }
+      return totalExtra;
     };
 
     return cart.reduce((acc, curr) => acc + (curr.item.price + customizationExtra(curr)) * curr.quantity, 0);
@@ -214,12 +224,6 @@ export default function CartView({
     // Simulate Order Placement Success using timestamp + random suffix for uniqueness
     const randomID = `#CF-${Date.now().toString(36).toUpperCase().slice(-4)}${Math.floor(10 + Math.random() * 90)}`;
     
-    // Calculate total order pricing
-    const subtotal = cart.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
-    const deliveryFee = 300; // Match state summary flat fee
-    const discount = promoApplied ? Math.round(subtotal * 0.1) : 0; // Match 10% promo discount
-    const total = subtotal + deliveryFee - discount;
-
     const newOrder: OrderDetails = {
       id: randomID,
       fullName: fullName.trim(),
@@ -229,9 +233,9 @@ export default function CartView({
       specialInstructions: specialInstructions.trim(),
       paymentMethod,
       items: [...cart],
-      subtotal,
-      deliveryFee,
-      total,
+      subtotal, // Use the memoized subtotal which includes customization costs
+      deliveryFee, // Use the constant deliveryFee
+      total, // Use the memoized total which includes discount and delivery fee
       status: 'Placed',
       userEmail: currentUser?.email || 'guest',
       createdAt: new Date().toISOString()
@@ -306,17 +310,24 @@ export default function CartView({
 
               <div className="divide-y divide-orange-50">
                 {cart.map((cartItem) => {
-                  const customizationExtra = (ci: CartItem) => {
+                  const customizationExtra = (ci: CartItem): number => {
                     if (!ci.customizations || !ci.item.customOptions) return 0;
-                    return ci.item.customOptions.reduce((sum, opt) => {
-                      const val = ci.customizations ? ci.customizations[opt.id] : undefined;
-                      if (opt.mode === 'quantity') {
-                        const unitPrice = opt.choices[0]?.price ?? 0;
-                        return sum + (Number(val) || 0) * unitPrice;
+                  
+                    let totalExtra = 0;
+                    for (const optionId in ci.customizations) {
+                      const selectedChoices = ci.customizations[optionId];
+                      const optionDetails = ci.item.customOptions.find(opt => opt.id === optionId);
+                      if (!optionDetails) continue;
+                  
+                      for (const choiceValue in selectedChoices) {
+                        const quantity = selectedChoices[choiceValue];
+                        const choiceDetails = optionDetails.choices.find(c => String(c.value) === String(choiceValue));
+                        if (choiceDetails && choiceDetails.price) {
+                          totalExtra += choiceDetails.price * quantity;
+                        }
                       }
-                      const choice = opt.choices.find(c => c.value === val);
-                      return sum + (choice?.price ?? 0);
-                    }, 0);
+                    }
+                    return totalExtra;
                   };
 
                   const perUnit = cartItem.item.price + customizationExtra(cartItem);
@@ -335,14 +346,22 @@ export default function CartView({
                           <h3 className="font-display font-bold text-sm text-brand-dark leading-snug break-words">
                             {cartItem.item.name}
                           </h3>
-                          {cartItem.customizations && (
-                            <div className="mt-1 text-[11px] text-gray-500 space-y-1">
-                              {Object.entries(cartItem.customizations).map(([key, value]) => (
-                                <p key={key} className="leading-snug capitalize">
-                                  {key.replace(/([A-Z])/g, ' $1')}: {String(value)}
-                                </p>
-                              ))}
-                            </div>
+                          {cartItem.customizations && Object.keys(cartItem.customizations).length > 0 && (
+                            <ul className="mt-1 text-[11px] text-gray-500 list-disc list-inside space-y-0.5">
+                              {Object.entries(cartItem.customizations).flatMap(([optionId, choices]) => {
+                                const option = cartItem.item.customOptions?.find(o => o.id === optionId);
+                                return Object.entries(choices).map(([choiceValue, quantity]) => {
+                                  if (quantity === 0) return null;
+                                  const choice = option?.choices.find(c => String(c.value) === String(choiceValue));
+                                  const choiceLabel = choice ? choice.label : String(choiceValue);
+                                  return (
+                                    <li key={`${optionId}-${choiceValue}`}>
+                                      {quantity > 1 ? `${quantity}x ` : ''}{choiceLabel}
+                                    </li>
+                                  );
+                                });
+                              })}
+                            </ul>
                           )}
                           <p className="text-xs text-brand-orange font-bold mt-1">
                             ₦{cartItem.item.price.toLocaleString()} each
@@ -356,7 +375,7 @@ export default function CartView({
                         {/* +/- controls */}
                         <div className="flex items-center bg-orange-50/50 border border-orange-100/50 rounded-2xl p-1 shrink-0">
                           <button
-                            onClick={() => onUpdateCartQuantity(cartItem.item.id, -1)}
+                            onClick={() => onUpdateCartQuantity(cartItem.cartId, -1)}
                             className="w-6.5 h-6.5 rounded-lg bg-white text-gray-500 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
                           >
                             -
@@ -365,7 +384,7 @@ export default function CartView({
                             {cartItem.quantity}
                           </span>
                           <button
-                            onClick={() => onUpdateCartQuantity(cartItem.item.id, 1)}
+                            onClick={() => onUpdateCartQuantity(cartItem.cartId, 1)}
                             className="w-6.5 h-6.5 rounded-lg bg-white text-gray-500 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
                           >
                             +
@@ -640,28 +659,7 @@ export default function CartView({
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => {
                           e.preventDefault();
-                          setScreenshotError(null);
-                          const file = e.dataTransfer.files?.[0];
-                          if (file) {
-                            if (file.size > 5 * 1024 * 1024) {
-                              setScreenshotError('File size is too large. Max size is 5MB.');
-                              setTransferScreenshot(null);
-                              setScreenshotPreview(null);
-                              return;
-                            }
-                            if (!file.type.startsWith('image/')) {
-                              setScreenshotError('Please upload an image file (PNG, JPG, JPEG).');
-                              setTransferScreenshot(null);
-                              setScreenshotPreview(null);
-                              return;
-                            }
-                            setTransferScreenshot(file);
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setScreenshotPreview(reader.result as string);
-                            };
-                            reader.readAsDataURL(file);
-                          }
+                          handleFile(e.dataTransfer.files?.[0]);
                         }}
                         className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition-all ${
                           transferScreenshot 
