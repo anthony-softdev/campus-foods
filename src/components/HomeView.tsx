@@ -5,7 +5,7 @@ import { MenuItem, CartItem, ViewType } from '../types';
 interface HomeViewProps {
   onNavigate: (view: ViewType) => void;
   cart: CartItem[];
-  onAddToCart: (item: MenuItem) => void;
+  onAddToCart: (item: MenuItem, customizations?: Record<string, Record<string, number>>) => void;
   onUpdateCartQuantity: (itemId: string, dQuantity: number) => void;
   menuItems: MenuItem[];
 }
@@ -28,11 +28,9 @@ export default function HomeView({ onNavigate, cart, onAddToCart, onUpdateCartQu
   // Get 6-8 popular items
   const popularItems = menuItems.filter(item => item.popular && item.inStock !== false); // Also filter by inStock
 
-  const getCartQuantity = (itemId: string) => {
-    // Find item without customizations. The cartId format must match what the parent expects.
-    const cartIdForSimpleItem = `${itemId}|{}`;
-    const found = cart.find(c => c.cartId === cartIdForSimpleItem);
-    return found ? found.quantity : 0;
+  const getSimpleCartItem = (itemId: string) => {
+    // Find item without customizations.
+    return cart.find(c => c.item.id === itemId && (!c.customizations || Object.keys(c.customizations).length === 0));
   };
 
   const reviews = [
@@ -220,8 +218,8 @@ export default function HomeView({ onNavigate, cart, onAddToCart, onUpdateCartQu
           {/* Horizontal slider container for mobile / Grid on desktop */}
           <div className="flex overflow-x-auto pb-4 gap-6 custom-scrollbar sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:overflow-visible">
             {popularItems.slice(0, 8).map((item) => {
-              const qty = getCartQuantity(item.id);
-              const cartIdForSimpleItem = `${item.id}|{}`;
+              const simpleCartItem = getSimpleCartItem(item.id);
+              const qty = simpleCartItem ? simpleCartItem.quantity : 0;
               return (
                 <div 
                   key={item.id} 
@@ -261,21 +259,21 @@ export default function HomeView({ onNavigate, cart, onAddToCart, onUpdateCartQu
                       {/* Add to Cart Actions */}
                       {qty > 0 ? (
                         <div className="flex items-center bg-orange-50 border border-orange-100 rounded-2xl py-1.5 px-3">
-                          <button
-                            onClick={() => onUpdateCartQuantity(cartIdForSimpleItem, -1)}
+                          {simpleCartItem && <button
+                            onClick={() => onUpdateCartQuantity(simpleCartItem.cartId, -1)}
                             className="w-6 h-6 rounded-lg bg-white text-brand-orange hover:bg-brand-orange hover:text-white flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
                           >
                             -
-                          </button>
+                          </button>}
                           <span className="px-3 text-sm font-bold font-sans text-brand-orange">
                             {qty}
                           </span>
-                          <button
-                            onClick={() => onUpdateCartQuantity(cartIdForSimpleItem, 1)}
+                          {simpleCartItem && <button
+                            onClick={() => onUpdateCartQuantity(simpleCartItem.cartId, 1)}
                             className="w-6 h-6 rounded-lg bg-white text-brand-orange hover:bg-brand-orange hover:text-white flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
                           >
                             +
-                          </button>
+                          </button>}
                         </div>
                       ) : (
                         <button

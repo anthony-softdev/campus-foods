@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Trash2, Plus, Minus, CreditCard, Landmark, Truck, ShieldCheck, CheckCircle2, ShoppingCart, HelpCircle, User, Award } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Trash2, Plus, Minus, CreditCard, Landmark, Truck, ShieldCheck, CheckCircle2, ShoppingCart, HelpCircle, User, Award, Edit } from 'lucide-react';
 import { MenuItem, CartItem, PaymentMethod, UserProfile, OrderDetails, ViewType } from '../types';
 import { createOrderInDb } from '../firebase';
 import { HOSTELLOCATIONS } from '../data/menu';
@@ -11,6 +11,8 @@ interface CartViewProps {
   onClearCart: () => void;
   onNavigate: (view: ViewType) => void;
   currentUser: UserProfile | null;
+  onUpdateCartItemCustomizations: (cartItemId: string, newCustomizations: Record<string, Record<string, number>>) => void;
+  deliveryFee?: number;
 }
 
 export default function CartView({
@@ -19,7 +21,9 @@ export default function CartView({
   onRemoveFromCart,
   onClearCart,
   onNavigate,
-  currentUser
+  currentUser,
+  onUpdateCartItemCustomizations,
+  deliveryFee = 300, // Default to 300 if not provided
 }: CartViewProps) {
   // Form values pre-populated if user is logged in
   const [fullName, setFullName] = useState(currentUser?.fullName || '');
@@ -33,6 +37,10 @@ export default function CartView({
   const [transferScreenshot, setTransferScreenshot] = useState<File | null>(null);
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
   const [screenshotError, setScreenshotError] = useState<string | null>(null);
+
+  // State for inline customization editing
+  const [editingCartId, setEditingCartId] = useState<string | null>(null);
+  const [currentCustomizations, setCurrentCustomizations] = useState<Record<string, Record<string, number>>>({});
 
   const handleFile = (file: File | undefined | null) => {
     setScreenshotError(null);
@@ -93,32 +101,85 @@ export default function CartView({
   const [cardCvv, setCardCvv] = useState('');
 
   // Cost tallies
-  const deliveryFee = 300; // Flat fee ₦300
-
-  const subtotal = useMemo(() => {
-    const customizationExtra = (ci: CartItem): number => {
-      if (!ci.customizations || !ci.item.customOptions) return 0;
-    
-      let totalExtra = 0;
-      // ci.customizations is { optionId: { choiceValue: quantity } }
-      for (const optionId in ci.customizations) {
-        const selectedChoices = ci.customizations[optionId];
-        const optionDetails = ci.item.customOptions.find(opt => opt.id === optionId);
-        if (!optionDetails) continue;
-    
-        for (const choiceValue in selectedChoices) {
-          const quantity = selectedChoices[choiceValue];
-          const choiceDetails = optionDetails.choices.find(c => String(c.value) === String(choiceValue));
-          if (choiceDetails && choiceDetails.price) {
-            totalExtra += choiceDetails.price * quantity;
-          }
+  const getCustomizationExtra = useCallback((ci: CartItem): number => {
+    if (!ci.customizations || !ci.item.customOptions) return 0;
+  
+    let totalExtra = 0;
+    // ci.customizations is { optionId: { choiceValue: quantity } }
+    for (const optionId in ci.customizations) {
+      const selectedChoices = ci.customizations[optionId];
+      const optionDetails = ci.item.customOptions.find(opt => opt.id === optionId);
+      if (!optionDetails) continue;
+  
+      for (const choiceValue in selectedChoices) {
+        const quantity = selectedChoices[choiceValue];
+        const choiceDetails = optionDetails.choices.find(c => String(c.value) === String(choiceValue));
+        if (choiceDetails && choiceDetails.price) {
+          totalExtra += choiceDetails.price * quantity;
         }
       }
-      return totalExtra;
-    };
+    }
+    return totalExtra;
+  }, []);
 
-    return cart.reduce((acc, curr) => acc + (curr.item.price + customizationExtra(curr)) * curr.quantity, 0);
-  }, [cart]);
+  const subtotal = useMemo(() => {
+    return cart.reduce((acc, curr) => acc + (curr.item.price + getCustomizationExtra(curr)) * curr.quantity, 0);
+  }, [cart, getCustomizationExtra]);
+
+  // --- Customization Editing Logic ---
+  const handleEditCustomizations = (cartItem: CartItem) => {
+    setEditingCartId(cartItem.cartId);
+    // Deep copy customizations to avoid direct state mutation
+    setCurrentCustomizations(cartItem.customizations ? JSON.parse(JSON.stringify(cartItem.customizations)) : {});
+  };
+
+  const handleCancelEditing = () => {
+    setEditingCartId(null);
+    setCurrentCustomizations({});
+  };
+
+  const updateChoiceQuantity = (optionId: string, choiceValue: string | number, dQuantity: number) => {
+    setCurrentCustomizations(prev => {
+      const newCustomizations = { ...prev };
+      const optionCustoms = { ...(newCustomizations[optionId] || {}) };
+  
+      const currentQty = optionCustoms[String(choiceValue)] || 0;
+      let newQty = currentQty + dQuantity;
+  
+      if (newQty < 0) newQty = 0;
+  
+      if (newQty === 0) {
+        delete optionCustoms[String(choiceValue)];
+      } else {
+        optionCustoms[String(choiceValue)] = newQty;
+      }
+  
+      newCustomizations[optionId] = optionCustoms;
+      return newCustomizations;
+    });
+  };
+
+  const handleSaveCustomizations = (originalCartItem: CartItem) => {
+    // Filter out empty options and choices with 0 quantity
+    const finalCustomizations: Record<string, Record<string, number>> = {};
+    Object.entries(currentCustomizations).forEach(([optionId, choices]) => {
+      const validChoices = Object.entries(choices).filter(([, qty]) => qty > 0);
+      if (validChoices.length > 0) {
+        finalCustomizations[optionId] = Object.fromEntries(validChoices);
+      }
+    });
+
+    // Check if customizations actually changed to avoid unnecessary operations
+    const originalCustoms = originalCartItem.customizations || {};
+    if (JSON.stringify(finalCustomizations) === JSON.stringify(originalCustoms)) {
+      handleCancelEditing();
+      return;
+    }
+
+    // Signal to the parent component to handle the update logic.
+    onUpdateCartItemCustomizations(originalCartItem.cartId, finalCustomizations);
+    handleCancelEditing();
+  };
 
   const discount = useMemo(() => {
     return promoApplied ? Math.round(subtotal * 0.1) : 0; // 10% student promo discount
@@ -126,7 +187,7 @@ export default function CartView({
 
   const total = useMemo(() => {
     return subtotal - discount + deliveryFee;
-  }, [subtotal, discount]);
+  }, [subtotal, discount, deliveryFee]);
 
   // Handle promo code application
   const handleApplyPromo = () => {
@@ -232,7 +293,8 @@ export default function CartView({
       roomNumber: roomNumber.trim() || 'N/A',
       specialInstructions: specialInstructions.trim(),
       paymentMethod,
-      items: [...cart],
+      // Sanitize cart items to remove undefined values before saving to Firestore.
+      items: JSON.parse(JSON.stringify(cart)),
       subtotal, // Use the memoized subtotal which includes customization costs
       deliveryFee, // Use the constant deliveryFee
       total, // Use the memoized total which includes discount and delivery fee
@@ -310,30 +372,11 @@ export default function CartView({
 
               <div className="divide-y divide-orange-50">
                 {cart.map((cartItem) => {
-                  const customizationExtra = (ci: CartItem): number => {
-                    if (!ci.customizations || !ci.item.customOptions) return 0;
-                  
-                    let totalExtra = 0;
-                    for (const optionId in ci.customizations) {
-                      const selectedChoices = ci.customizations[optionId];
-                      const optionDetails = ci.item.customOptions.find(opt => opt.id === optionId);
-                      if (!optionDetails) continue;
-                  
-                      for (const choiceValue in selectedChoices) {
-                        const quantity = selectedChoices[choiceValue];
-                        const choiceDetails = optionDetails.choices.find(c => String(c.value) === String(choiceValue));
-                        if (choiceDetails && choiceDetails.price) {
-                          totalExtra += choiceDetails.price * quantity;
-                        }
-                      }
-                    }
-                    return totalExtra;
-                  };
 
-                  const perUnit = cartItem.item.price + customizationExtra(cartItem);
+                  const perUnit = cartItem.item.price + getCustomizationExtra(cartItem);
                   const itemTotal = perUnit * cartItem.quantity;
                   return (
-                    <div key={cartItem.cartId} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 animate-fadeIn">
+                    <div key={cartItem.cartId} className="py-4 flex flex-wrap items-start justify-between gap-4 animate-fadeIn">
                       
                       {/* Product details (Image + Name + unit price) */}
                       <div className="flex items-center gap-3.5 flex-1 min-w-0">
@@ -355,7 +398,7 @@ export default function CartView({
                                   const choice = option?.choices.find(c => String(c.value) === String(choiceValue));
                                   const choiceLabel = choice ? choice.label : String(choiceValue);
                                   return (
-                                    <li key={`${optionId}-${choiceValue}`}>
+                                    <li key={`${optionId}-${choiceValue}`} className="capitalize">
                                       {quantity > 1 ? `${quantity}x ` : ''}{choiceLabel}
                                     </li>
                                   );
@@ -363,20 +406,87 @@ export default function CartView({
                               })}
                             </ul>
                           )}
+                          {cartItem.item.customOptions && cartItem.item.customOptions.length > 0 && (
+                            <button 
+                              onClick={() => editingCartId === cartItem.cartId ? handleCancelEditing() : handleEditCustomizations(cartItem)}
+                              className="mt-2 text-[10px] font-bold text-brand-orange hover:underline flex items-center gap-1"
+                            >
+                              <Edit size={11} />
+                              {editingCartId === cartItem.cartId ? 'Cancel Customization' : (Object.keys(cartItem.customizations || {}).length > 0 ? 'Edit Options' : 'Add Options')}
+                            </button>
+                          )}
                           <p className="text-xs text-brand-orange font-bold mt-1">
                             ₦{cartItem.item.price.toLocaleString()} each
                           </p>
                         </div>
                       </div>
 
+                      {/* --- INLINE CUSTOMIZATION EDITOR --- */}
+                      {editingCartId === cartItem.cartId && (
+                        <div className="w-full bg-orange-50/60 rounded-3xl p-4 border border-orange-100/70 mt-2 space-y-4 animate-fadeIn">
+                          <h4 className="text-xs font-bold text-brand-dark uppercase tracking-wider">Customize "{cartItem.item.name}"</h4>
+                          {cartItem.item.customOptions?.map((option) => (
+                            <div key={option.id} className="space-y-2">
+                              <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider">{option.label}</label>
+                              {option.choices.map(choice => {
+                                const qty = currentCustomizations[option.id]?.[String(choice.value)] || 0;
+                                return (
+                                  <div key={String(choice.value)} className="flex items-center justify-between gap-2 bg-white/50 p-2 rounded-xl">
+                                    <div className="text-xs font-semibold text-gray-800">
+                                      {choice.label}
+                                      {choice.price > 0 && <span className="text-gray-500 ml-1">(+₦{choice.price.toLocaleString()})</span>}
+                                    </div>
+                                    <div className="flex items-center bg-white border border-orange-100/50 rounded-xl p-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => updateChoiceQuantity(option.id, choice.value, -1)}
+                                        className="w-6 h-6 rounded-lg bg-orange-50 text-gray-600 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
+                                      >
+                                        -
+                                      </button>
+                                      <span className="px-3 text-xs font-bold font-sans text-brand-dark min-w-[20px] text-center">
+                                        {qty}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => updateChoiceQuantity(option.id, choice.value, 1)}
+                                        className="w-6 h-6 rounded-lg bg-orange-50 text-gray-600 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
+                          <div className="flex gap-2 pt-2 border-t border-orange-100">
+                            <button
+                              type="button"
+                              onClick={() => handleSaveCustomizations(cartItem)}
+                              className="px-4 py-2 text-xs font-bold rounded-2xl bg-brand-orange text-white hover:bg-[#e07f00] transition-colors"
+                            >
+                              Update Item
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEditing}
+                              className="px-4 py-2 text-xs font-bold rounded-2xl bg-white border border-orange-200 text-brand-orange hover:bg-orange-50 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Controls and Actions row */}
-                      <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 shrink-0 pt-2 sm:pt-0 border-t border-dashed border-gray-100 sm:border-0">
+                      <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 shrink-0">
                         
                         {/* +/- controls */}
                         <div className="flex items-center bg-orange-50/50 border border-orange-100/50 rounded-2xl p-1 shrink-0">
                           <button
                             onClick={() => onUpdateCartQuantity(cartItem.cartId, -1)}
-                            className="w-6.5 h-6.5 rounded-lg bg-white text-gray-500 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
+                            className="w-7 h-7 rounded-lg bg-white text-gray-500 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
                           >
                             -
                           </button>
@@ -385,7 +495,7 @@ export default function CartView({
                           </span>
                           <button
                             onClick={() => onUpdateCartQuantity(cartItem.cartId, 1)}
-                            className="w-6.5 h-6.5 rounded-lg bg-white text-gray-500 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
+                            className="w-7 h-7 rounded-lg bg-white text-gray-500 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
                           >
                             +
                           </button>
@@ -470,7 +580,7 @@ export default function CartView({
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                     className={`w-full min-w-0 bg-[#fff9f2]/30 hover:bg-[#fff9f2]/60 focus:bg-white text-xs font-sans font-semibold text-[#1a1a1a] p-3.5 rounded-2xl border outline-none transition-all ${
-                      errors.fullName ? 'border-red-450 focus:ring-1 focus:ring-red-450' : 'border-orange-100 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange'
+                      errors.fullName ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-orange-100 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange'
                     }`}
                   />
                   {errors.fullName && <p className="text-[10px] text-red-500 font-bold">{errors.fullName}</p>}
@@ -488,7 +598,7 @@ export default function CartView({
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     className={`w-full min-w-0 bg-[#fff9f2]/30 hover:bg-[#fff9f2]/60 focus:bg-white text-xs font-sans font-semibold text-[#1a1a1a] p-3.5 rounded-2xl border outline-none transition-all ${
-                      errors.phoneNumber ? 'border-red-450 focus:ring-1 focus:ring-red-450' : 'border-orange-100 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange'
+                      errors.phoneNumber ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-orange-100 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange'
                     }`}
                   />
                   {errors.phoneNumber && <p className="text-[10px] text-red-500 font-bold">{errors.phoneNumber}</p>}
@@ -506,7 +616,7 @@ export default function CartView({
                     value={deliveryLocation}
                     onChange={(e) => setDeliveryLocation(e.target.value)}
                     className={`w-full min-w-0 bg-[#fff9f2]/30 hover:bg-[#fff9f2]/60 focus:bg-white text-xs font-sans font-semibold text-[#1a1a1a] p-3.5 rounded-2xl border outline-none transition-all cursor-pointer ${
-                      errors.deliveryLocation ? 'border-red-450 focus:ring-1 focus:ring-red-450' : 'border-orange-100 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange'
+                      errors.deliveryLocation ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-orange-100 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange'
                     }`}
                   >
                     <option value="">Select Delivery Location</option>
@@ -785,7 +895,7 @@ export default function CartView({
                 </div>
 
                 { promoApplied && (
-                  <div className="flex justify-between text-emerald-605 font-medium">
+                  <div className="flex justify-between text-emerald-600 font-medium">
                     <span>10% Student Promo Discount</span>
                     <span className="font-bold">-₦{discount.toLocaleString()}</span>
                   </div>

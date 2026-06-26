@@ -17,18 +17,17 @@ import {
   Shield, 
   ChevronDown,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import bcrypt from 'bcryptjs';
-import { UserProfile } from '../types';
+import { UserProfile, ViewType } from '../types';
 import { auth, getUserProfileFromDb, saveUserProfileToDb } from '../firebase';
 import { HOSTELLOCATIONS } from '../data/menu';
 
 interface AuthViewProps {
   onAuthSuccess: (user: UserProfile, isNewUser?: boolean) => void;
-  onNavigate: (view: any, authTab?: 'signin' | 'signup') => void;
+  onNavigate: (view: ViewType, authTab?: 'signin' | 'signup') => void;
   initialTab?: 'signin' | 'signup';
-  key?: string | number;
 }
 
 export default function AuthView({ onAuthSuccess, onNavigate, initialTab = 'signin' }: AuthViewProps): React.JSX.Element {

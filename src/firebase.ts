@@ -168,6 +168,33 @@ export async function deleteMenuItemFromDb(id: string): Promise<void> {
   }
 }
 
+export function listenAppConfigFromDb(callback: (config: { deliveryFee: number }) => void) {
+  const path = 'config/main';
+  const docRef = doc(db, 'config', 'main');
+  return onSnapshot(docRef, (snapshot) => {
+    if (snapshot.exists()) {
+      callback(snapshot.data() as { deliveryFee: number });
+    } else {
+      // If it doesn't exist, create it with a default and the listener will pick it up.
+      console.log("No config found, creating with default delivery fee 300");
+      setDoc(docRef, { deliveryFee: 300 }).catch(e => handleFirestoreError(e, OperationType.WRITE, path));
+      callback({ deliveryFee: 300 }); // also callback immediately with default
+    }
+  }, (error) => {
+    handleFirestoreError(error, OperationType.GET, path);
+  });
+}
+
+export async function updateDeliveryFeeInDb(newFee: number): Promise<void> {
+  const path = 'config/main';
+  try {
+    const docRef = doc(db, 'config', 'main');
+    await updateDoc(docRef, { deliveryFee: newFee });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
 // --- Orders helpers ---
 export function listenAllOrdersFromDb(callback: (orders: OrderDetails[]) => void) {
   const path = 'orders';
@@ -215,6 +242,15 @@ export async function updateOrderStatusInDb(orderId: string, status: OrderDetail
     await updateDoc(docRef, { status });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteOrderFromDb(orderId: string): Promise<void> {
+  const path = `orders/${orderId}`;
+  try {
+    await deleteDoc(doc(db, 'orders', orderId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
 

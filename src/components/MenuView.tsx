@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Search, SlidersHorizontal, RotateCcw, AlertCircle, ShoppingBag, Check, ArrowRight } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Search, SlidersHorizontal, RotateCcw, AlertCircle, ShoppingBag, Check, ArrowRight, Plus, Minus } from 'lucide-react';
 import { MenuItem, Category, CartItem, ViewType } from '../types';
 
 interface MenuViewProps {
@@ -15,7 +15,6 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
   const [searchQuery, setSearchQuery] = useState('');
   const [addingId, setAddingId] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [customizations, setCustomizations] = useState<Record<string, Record<string, Record<string, number>>>>({});
 
   const categories: Category[] = ['All', 'Nigerian Meals', 'Fast Foods', 'Snacks', 'Drinks'];
 
@@ -49,12 +48,12 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
       return matchesCategory && matchesSearch; // Show all items, regardless of stock status
     });
   }, [menuItems, selectedCategory, searchQuery]);
-
+  
   const totalCartItems = useMemo(() => {
     return cart.reduce((acc, current) => acc + current.quantity, 0);
   }, [cart]);
-
-  const customizationExtra = (ci: CartItem) => {
+  
+  const customizationExtra = useCallback((ci: CartItem) => {
     if (!ci.customizations || !ci.item.customOptions) return 0;
   
     let totalExtra = 0;
@@ -73,71 +72,12 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
       }
     }
     return totalExtra;
-  };
+  }, []);
 
   const cartTotalValue = useMemo(() => {
     return cart.reduce((acc, current) => acc + (current.item.price + customizationExtra(current)) * current.quantity, 0);
-  }, [cart]);
+  }, [cart, customizationExtra]);
 
-  const initializeCustomization = (item: MenuItem) => {
-    if (!item.customOptions) return;
-    setCustomizations((prev) => {
-      if (prev[item.id]) return prev; // Already open
-      const itemCustomizations: Record<string, Record<string, number>> = {};
-      item.customOptions.forEach(option => {
-        itemCustomizations[option.id] = {}; // Initialize each option with an empty object for choices
-      });
-      return { ...prev, [item.id]: itemCustomizations };
-    });
-  };
-
-  const updateChoiceQuantity = (itemId: string, optionId: string, choiceValue: string | number, dQuantity: number) => {
-    setCustomizations(prev => {
-      const newCustomizations = { ...prev };
-      const itemCustoms = { ...(newCustomizations[itemId] || {}) };
-      const optionCustoms = { ...(itemCustoms[optionId] || {}) };
-  
-      const currentQty = optionCustoms[String(choiceValue)] || 0;
-      let newQty = currentQty + dQuantity;
-  
-      if (newQty < 0) newQty = 0;
-  
-      if (newQty === 0) {
-        delete optionCustoms[String(choiceValue)];
-      } else {
-        optionCustoms[String(choiceValue)] = newQty;
-      }
-  
-      itemCustoms[optionId] = optionCustoms;
-      newCustomizations[itemId] = itemCustoms;
-      return newCustomizations;
-    });
-  };
-
-  const clearCustomization = (itemId: string) => {
-    setCustomizations((prev) => {
-      const next = { ...prev };
-      delete next[itemId];
-      return next;
-    });
-  };
-
-  const handleAddCustomizedItem = (item: MenuItem) => {
-    const itemCustoms = customizations[item.id];
-    if (!itemCustoms) return;
-
-    // Filter out empty options and choices with 0 quantity before adding to cart
-    const finalCustomizations: Record<string, Record<string, number>> = {};
-    Object.entries(itemCustoms).forEach(([optionId, choices]) => {
-      const validChoices = Object.entries(choices).filter(([, qty]) => qty > 0);
-      if (validChoices.length > 0) {
-        finalCustomizations[optionId] = Object.fromEntries(validChoices);
-      }
-    });
-
-    onAddToCart(item, finalCustomizations);
-    clearCustomization(item.id);
-  };
   return (
     <div className="pt-24 pb-24 space-y-8 animate-fadeIn max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
       
@@ -152,7 +92,7 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
         {totalCartItems > 0 && (
           <button
             onClick={() => onNavigate('cart')}
-            className="flex items-center gap-2 bg-[#fff6ea] border border-orange-250 text-brand-orange hover:bg-orange-100 font-sans font-bold px-4 py-2.5 rounded-full text-xs transition-colors cursor-pointer"
+            className="flex items-center gap-2 bg-[#fff6ea] border border-orange-300 text-brand-orange hover:bg-orange-100 font-sans font-bold px-4 py-2.5 rounded-full text-xs transition-colors cursor-pointer"
           >
             <ShoppingBag size={14} />
             <span>View Cart ({totalCartItems} items)</span>
@@ -221,8 +161,8 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
       {filteredItems.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-6 lg:gap-8 items-start">
           {filteredItems.map((item) => {
-            const cartItemsForThisMenuItem = cart.filter(ci => ci.item.id === item.id);
             const isCurrentlyAdding = addingId === item.id;
+            const cartItem = cart.find(ci => ci.item.id === item.id && (!ci.customizations || Object.keys(ci.customizations).length === 0));
             return (
               <div
                 key={item.id}
@@ -251,84 +191,6 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
                     <p className="text-xs text-gray-600 font-sans line-clamp-2 leading-relaxed">
                       {item.description}
                     </p>
-
-                    {item.customOptions && item.customOptions.length > 0 && item.inStock !== false && ( // Only show custom options if in stock
-                      <div className="bg-orange-50/60 rounded-3xl p-3 border border-orange-100/70 mt-3 space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <span className="block text-[8px] font-bold tracking-wider text-brand-orange uppercase leading-none">CUSTOMIZE THIS DISH</span>
-                            <p className="text-[10px] text-gray-500 mt-1">Select your preferred protein and portion or egg preparation.</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => initializeCustomization(item)}
-                            className="px-3 py-2 text-[10px] font-bold uppercase rounded-2xl bg-white border border-orange-200 text-brand-orange hover:bg-orange-100 transition-colors"
-                          >
-                            Customize
-                          </button>
-                        </div>
-
-                        {customizations[item.id] && (
-                          <div className="space-y-3 pt-2">
-                            {item.customOptions.map((option) => {
-                              const choices = option.choices;
-                              return (
-                                <div key={option.id} className="space-y-2">
-                                  <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider">{option.label}</label>
-                                  {choices.map(choice => {
-                                    const qty = customizations[item.id]?.[option.id]?.[String(choice.value)] || 0;
-                                    return (
-                                      <div key={String(choice.value)} className="flex items-center justify-between gap-2 bg-white/50 p-2 rounded-xl">
-                                        <div className="text-xs font-semibold text-gray-800">
-                                          {choice.label}
-                                          {choice.price > 0 && <span className="text-gray-500 ml-1">(+₦{choice.price.toLocaleString()})</span>}
-                                        </div>
-                                        <div className="flex items-center bg-white border border-orange-100/50 rounded-xl p-1 shrink-0">
-                                          <button
-                                            type="button"
-                                            onClick={() => updateChoiceQuantity(item.id, option.id, choice.value, -1)}
-                                            className="w-6 h-6 rounded-lg bg-orange-50 text-gray-600 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
-                                          >
-                                            -
-                                          </button>
-                                          <span className="px-3 text-xs font-bold font-sans text-brand-dark min-w-[20px] text-center">
-                                            {qty}
-                                          </span>
-                                          <button
-                                            type="button"
-                                            onClick={() => updateChoiceQuantity(item.id, option.id, choice.value, 1)}
-                                            className="w-6 h-6 rounded-lg bg-orange-50 text-gray-600 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
-                                          >
-                                            +
-                                          </button>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })}
-
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleAddCustomizedItem(item)}
-                                className="px-4 py-2 text-xs font-bold rounded-2xl bg-brand-orange text-white hover:bg-[#e07f00] transition-colors"
-                              >
-                                Add Customized Meal
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => clearCustomization(item.id)}
-                                className="px-4 py-2 text-xs font-bold rounded-2xl bg-white border border-orange-200 text-brand-orange hover:bg-orange-50 transition-colors"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   {/* Pricing and cart controls */}
@@ -340,8 +202,25 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
                       </div>
 
                       {item.inStock !== false ? (
-                        // If there are no versions of this item in the cart, show the "Add to Cart" button
-                        cartItemsForThisMenuItem.length === 0 && (
+                        cartItem ? (
+                          <div className="flex items-center bg-orange-50/50 border border-orange-100/50 rounded-2xl p-1 shrink-0">
+                            <button
+                              onClick={() => onUpdateCartQuantity(cartItem.cartId, -1)}
+                              className="w-7 h-7 rounded-lg bg-white text-gray-500 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
+                            >
+                              <Minus size={12} />
+                            </button>
+                            <span className="px-3 text-xs font-bold font-sans text-brand-dark">
+                              {cartItem.quantity}
+                            </span>
+                            <button
+                              onClick={() => onUpdateCartQuantity(cartItem.cartId, 1)}
+                              className="w-7 h-7 rounded-lg bg-white text-gray-500 hover:text-brand-orange flex items-center justify-center font-bold text-xs shadow-sm transition-colors cursor-pointer select-none"
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                        ) : (
                           <button
                             onClick={() => {
                               onAddToCart(item);
@@ -367,51 +246,6 @@ export default function MenuView({ cart, onAddToCart, onUpdateCartQuantity, onNa
                         </button>
                       )}
                     </div>
-
-                    {/* If there are items in the cart, list them with their controls */}
-                    {cartItemsForThisMenuItem.length > 0 && (
-                      <div className="space-y-2 pt-2 border-t border-dashed border-orange-100">
-                        {cartItemsForThisMenuItem.map(cartItem => {
-                          const customizationDetails = cartItem.customizations && Object.keys(cartItem.customizations).length > 0 ?
-                            Object.entries(cartItem.customizations).flatMap(([optionId, choices]) => {
-                              const option = item.customOptions?.find(o => o.id === optionId);
-                              return Object.entries(choices).map(([choiceValue, quantity]) => {
-                                if (quantity === 0) return null;
-                                const choice = option?.choices.find(c => String(c.value) === String(choiceValue));
-                                const choiceLabel = choice ? choice.label : String(choiceValue);
-                                return (
-                                  <li key={`${optionId}-${choiceValue}`} className="text-gray-500 capitalize text-[10px] list-none ml-0">
-                                    {quantity > 1 ? `${quantity}x ` : ''}{choiceLabel}
-                                  </li>
-                                );
-                              });
-                            }).filter(Boolean)
-                          : null;
-
-                          return (
-                            <div key={cartItem.cartId} className="flex items-center justify-between gap-2">
-                              <div className="text-xs">
-                                <p className="font-bold text-gray-800">
-                                  {customizationDetails && customizationDetails.length > 0 ? 'Customized' : 'Standard'}
-                                </p>
-                                <ul className="space-y-0.5">{customizationDetails}</ul>
-                              </div>
-                              <div className="flex items-center justify-between bg-orange-50 border border-orange-100 rounded-2xl py-1 px-2.5">
-                                <button
-                                  onClick={() => onUpdateCartQuantity(cartItem.cartId, -1)}
-                                  className="w-5.5 h-5.5 rounded-lg bg-white text-brand-orange hover:bg-brand-orange hover:text-white flex items-center justify-center font-bold text-xs transition-colors cursor-pointer select-none"
-                                >-</button>
-                                <span className="px-2 text-xs font-bold font-sans text-brand-orange">{cartItem.quantity}</span>
-                                <button
-                                  onClick={() => onUpdateCartQuantity(cartItem.cartId, 1)}
-                                  className="w-5.5 h-5.5 rounded-lg bg-white text-brand-orange hover:bg-brand-orange hover:text-white flex items-center justify-center font-bold text-xs transition-colors cursor-pointer select-none"
-                                >+</button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
                   </div>
                 </div>
 

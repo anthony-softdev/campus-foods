@@ -148,10 +148,21 @@ export default function App() {
     metaDesc.setAttribute('content', descMap[currentView] || 'Nigerian University food delivery web service.');
   }, [currentView]);
 
+  const generateCartId = (itemId: string, customizations?: Record<string, Record<string, number>>): string => {
+    if (!customizations || Object.keys(customizations).length === 0) {
+      return `${itemId}|{}`;
+    }
+    // Sort keys to ensure consistent ID regardless of property order
+    const sortedCustomizations = Object.keys(customizations).sort().reduce((acc, key) => {
+      acc[key] = customizations[key];
+      return acc;
+    }, {} as Record<string, Record<string, number>>);
+    return `${itemId}|${JSON.stringify(sortedCustomizations)}`;
+  };
+
   // Handle adding an item to the cart
-  const handleAddToCart = (item: MenuItem, customizations?: Record<string, string | number>) => {
-    const sanitizedCustomizations = customizations && Object.keys(customizations).length ? customizations : undefined;
-    const cartId = `${item.id}|${JSON.stringify(sanitizedCustomizations ?? {})}`;
+  const handleAddToCart = (item: MenuItem, customizations?: Record<string, Record<string, number>>) => {
+    const cartId = generateCartId(item.id, customizations);
 
     setCart((prevCart) => {
       const existing = prevCart.find((ci) => ci.cartId === cartId);
@@ -160,7 +171,43 @@ export default function App() {
           ci.cartId === cartId ? { ...ci, quantity: ci.quantity + 1 } : ci
         );
       }
-      return [...prevCart, { cartId, item, quantity: 1, customizations: sanitizedCustomizations }];
+      const newCartItem: CartItem = { cartId, item, quantity: 1 };
+      if (customizations && Object.keys(customizations).length > 0) {
+        newCartItem.customizations = customizations;
+      }
+      return [...prevCart, newCartItem];
+    });
+  };
+
+  const handleUpdateCartItemCustomizations = (cartItemId: string, newCustomizations: Record<string, Record<string, number>>) => {
+    setCart(prevCart => {
+      const itemToUpdate = prevCart.find(item => item.cartId === cartItemId);
+      if (!itemToUpdate) {
+        console.error("Item to update not found in cart");
+        return prevCart;
+      }
+
+      const cartWithoutOldItem = prevCart.filter(item => item.cartId !== cartItemId);
+      const newCartId = generateCartId(itemToUpdate.item.id, newCustomizations);
+      const existingItemWithNewCustoms = cartWithoutOldItem.find(item => item.cartId === newCartId);
+
+      if (existingItemWithNewCustoms) {
+        return cartWithoutOldItem.map(item => 
+          item.cartId === newCartId 
+            ? { ...item, quantity: item.quantity + itemToUpdate.quantity } 
+            : item
+        );
+      } else {
+        const updatedItem: CartItem = {
+          ...itemToUpdate,
+          cartId: newCartId,
+          customizations: newCustomizations && Object.keys(newCustomizations).length > 0 ? newCustomizations : undefined,
+        };
+        if (!updatedItem.customizations) {
+          delete updatedItem.customizations;
+        }
+        return [...cartWithoutOldItem, updatedItem];
+      }
     });
   };
 
@@ -245,6 +292,7 @@ export default function App() {
               onClearCart={handleClearCart}
               onNavigate={handleNavigate}
               currentUser={currentUser}
+              onUpdateCartItemCustomizations={handleUpdateCartItemCustomizations}
             />
           )}
           {currentView === 'contact' && (
@@ -278,7 +326,6 @@ export default function App() {
           {currentView === 'admin' && (
             <AdminView 
               menuItems={menuItems}
-              onSetMenuItems={setMenuItems}
               onNavigate={handleNavigate}
               currentUser={currentUser}
               onSignOut={triggerSignOut}

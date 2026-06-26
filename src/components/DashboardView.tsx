@@ -4,7 +4,7 @@ import {
   RefreshCw, CheckCircle2, ArrowRight, ShieldCheck, 
   MapPinOff, ChefHat, Bike, HeartHandshake, Save
 } from 'lucide-react';
-import { OrderDetails, UserProfile, CartItem } from '../types';
+import { OrderDetails, UserProfile, CartItem, ViewType } from '../types';
 import { listenUserOrdersFromDb, updateOrderStatusInDb, saveUserProfileToDb } from '../firebase';
 import { HOSTELLOCATIONS } from '../data/menu';
 
@@ -12,7 +12,7 @@ interface DashboardViewProps {
   currentUser: UserProfile;
   activeCart: CartItem[];
   onSignOut: () => void;
-  onNavigate: (view: any) => void;
+  onNavigate: (view: ViewType) => void;
   onSetCart: (cart: CartItem[]) => void;
   isNewUser?: boolean;
 }
