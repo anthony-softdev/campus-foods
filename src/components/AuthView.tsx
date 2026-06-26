@@ -293,6 +293,59 @@ export default function AuthView({ onAuthSuccess, onNavigate, initialTab = 'sign
     const trimmedEmail = loginEmail.toLowerCase().trim();
     let profile: UserProfile | null = null;
 
+    try {
+      // 1. Check in Firestore
+      profile = await getUserProfileFromDb(trimmedEmail);
+
+      // 2. Fallback to localStorage if not in DB
+      if (!profile) {
+        const localUsersStr = localStorage.getItem('campus_foods_users');
+        if (localUsersStr) {
+          const localUsers = JSON.parse(localUsersStr);
+          const foundUser = localUsers.find((u: any) => u.email.toLowerCase().trim() === trimmedEmail);
+          if (foundUser) {
+            profile = foundUser;
+          }
+        }
+      }
+
+      if (!profile || !(profile as any).password) {
+        setErrorMsg('No account found with this email or password is not set. Please register or try Google Sign-In.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 3. Compare password
+      const passwordMatch = await bcrypt.compare(loginPassword, (profile as any).password);
+
+      if (!passwordMatch) {
+        setErrorMsg('Incorrect password. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 4. Success
+      localStorage.setItem('campus_foods_current_user', JSON.stringify(profile));
+      setSuccessMsg('Login successful! Welcome back.');
+      
+      setShowFeedbackModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Successfully logged in 🔑',
+        message: `Welcome back, ${profile.fullName}! Signing in...`,
+        onClose: () => {
+          setIsSubmitting(false);
+          onAuthSuccess(profile, false);
+        }
+      });
+
+    } catch (err: any) {
+      console.error('Sign In Error:', err);
+      setErrorMsg('An error occurred during sign in. Please try again.');
+      setIsSubmitting(false);
+    }
+  };
+
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
