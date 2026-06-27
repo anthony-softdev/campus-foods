@@ -116,11 +116,52 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
 
   const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // --- VALIDATION LOGIC ---
+    const newCustomOptionErrors: Record<number, Record<string, string>> = {};
+    let hasErrors = false;
+
+    formData.customOptions.forEach((option, optionIndex) => {
+      const errorsForOption: Record<string, string> = {};
+      if (!option.label.trim()) {
+        errorsForOption.label = 'Option label cannot be empty.';
+        hasErrors = true;
+      }
+      if (!option.id.trim()) {
+        errorsForOption.id = 'Option ID cannot be empty.';
+        hasErrors = true;
+      } else if (!/^[a-zA-Z0-9_]+$/.test(option.id.trim())) {
+        errorsForOption.id = 'ID must be alphanumeric with underscores only.';
+        hasErrors = true;
+      }
+
+      option.choices.forEach((choice, choiceIndex) => {
+        if (!choice.label.trim()) {
+          errorsForOption[`choice-${choiceIndex}-label`] = 'Choice label cannot be empty.';
+          hasErrors = true;
+        }
+        if (String(choice.value).trim() === '') {
+          errorsForOption[`choice-${choiceIndex}-value`] = 'Choice value cannot be empty.';
+          hasErrors = true;
+        }
+      });
+
+      if (Object.keys(errorsForOption).length > 0) {
+        newCustomOptionErrors[optionIndex] = errorsForOption;
+      }
+    });
+
+    setCustomOptionErrors(newCustomOptionErrors);
+
     if (!formData.name.trim() || !formData.description.trim() || !formData.image.trim()) {
       onShowToast('Please fill out all mandatory menu item details.', 'error');
       return;
     }
-    // ... (validation logic from original file)
+
+    if (hasErrors) {
+      onShowToast('Please fix the errors in the custom options section.', 'error');
+      return;
+    }
 
     try {
       if (isAddingNew) {

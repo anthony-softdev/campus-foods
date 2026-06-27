@@ -4,7 +4,7 @@ import { ViewType, UserProfile } from '../types';
 
 interface NavbarProps {
   currentView: ViewType;
-  onNavigate: (view: ViewType, authTab?: 'signin' | 'signup') => void;
+  onNavigate: (view: ViewType) => void;
   cartCount: number;
   currentUser: UserProfile | null;
   onSignOut: () => void;
@@ -55,8 +55,8 @@ export default function Navbar({ currentView, onNavigate, cartCount, currentUser
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleLinkClick = (view: ViewType, authTab?: 'signin' | 'signup') => {
-    onNavigate(view, authTab);
+  const handleLinkClick = (view: ViewType) => {
+    onNavigate(view);
     setIsMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -87,7 +87,7 @@ export default function Navbar({ currentView, onNavigate, cartCount, currentUser
           <div className="hidden md:flex items-center space-x-6">
             <button
               onClick={handleHomeClick}
-              className={`relative font-sans font-semibold text-[14px] py-2 transition-all duration-200 cursor-pointer ${
+              className={`relative font-sans font-semibold text-[15px] py-2 transition-all duration-200 cursor-pointer ${
                 currentView === 'home'
                   ? 'text-brand-orange' 
                   : 'text-gray-600 hover:text-brand-orange'
@@ -104,7 +104,7 @@ export default function Navbar({ currentView, onNavigate, cartCount, currentUser
 
             <button
               onClick={handleMenuClick}
-              className={`relative font-sans font-semibold text-[14px] py-2 transition-all duration-200 cursor-pointer ${
+              className={`relative font-sans font-semibold text-[15px] py-2 transition-all duration-200 cursor-pointer ${
                 currentView === 'menu'
                   ? 'text-brand-orange' 
                   : 'text-gray-600 hover:text-brand-orange'
@@ -121,7 +121,7 @@ export default function Navbar({ currentView, onNavigate, cartCount, currentUser
 
             <button
               onClick={handleAboutUsClick}
-              className="relative font-sans font-semibold text-[14px] py-2 transition-all duration-200 cursor-pointer text-gray-600 hover:text-brand-orange"
+              className="relative font-sans font-semibold text-[15px] py-2 transition-all duration-200 cursor-pointer text-gray-600 hover:text-brand-orange"
             >
               <span className="flex items-center gap-1.5">
                 <Info size={15} />
@@ -131,7 +131,7 @@ export default function Navbar({ currentView, onNavigate, cartCount, currentUser
 
             <button
               onClick={handleContactClick}
-              className={`relative font-sans font-semibold text-[14px] py-2 transition-all duration-200 cursor-pointer ${
+              className={`relative font-sans font-semibold text-[15px] py-2 transition-all duration-200 cursor-pointer ${
                 currentView === 'contact'
                   ? 'text-brand-orange' 
                   : 'text-gray-600 hover:text-brand-orange'
@@ -171,7 +171,7 @@ export default function Navbar({ currentView, onNavigate, cartCount, currentUser
                   onClick={() => handleLinkClick(currentUser.role === 'admin' ? 'admin' : 'dashboard')}
                   className="bg-orange-50 text-brand-orange hover:bg-orange-100 font-sans font-bold px-4 py-2 rounded-xl text-xs transition-all cursor-pointer"
                 >
-                  {currentUser.role === 'admin' ? 'Admin Portal' : 'My Dashboard'}
+                  {currentUser.role === 'admin' ? 'Admin Dashboard' : 'My Dashboard'}
                 </button>
                 <button
                   onClick={onSignOut}
@@ -182,20 +182,12 @@ export default function Navbar({ currentView, onNavigate, cartCount, currentUser
                 </button>
               </div>
             ) : (
-              <>
-                <button
-                  onClick={() => handleLinkClick('auth', 'signin')}
-                  className="text-gray-700 hover:text-brand-orange font-bold text-sm cursor-pointer transition-colors"
-                >
-                  Sign In
-                </button>
-                <button
-                  onClick={() => handleLinkClick('auth', 'signup')}
-                  className="bg-brand-orange hover:bg-[#e07f00] text-white font-bold px-5 py-2.5 rounded-full text-sm transition-all cursor-pointer"
-                >
-                  Register
-                </button>
-              </>
+              <button
+                onClick={() => handleLinkClick('auth')}
+                className="bg-brand-orange hover:bg-[#e07f00] text-white font-bold px-5 py-2.5 rounded-full text-sm transition-all cursor-pointer"
+              >
+                Sign In / Register
+              </button>
             )}
           </div>
 
@@ -279,22 +271,16 @@ export default function Navbar({ currentView, onNavigate, cartCount, currentUser
                     onClick={() => handleLinkClick(currentUser.role === 'admin' ? 'admin' : 'dashboard')}
                     className="w-full text-center bg-orange-50 text-brand-orange font-sans font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer block truncate"
                   >
-                    {currentUser.role === 'admin' ? 'Admin Portal' : 'My Dashboard'}
+                    {currentUser.role === 'admin' ? 'Admin Dashboard' : 'My Dashboard'}
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 px-2">
+                <div className="px-2">
                   <button
-                    onClick={() => handleLinkClick('auth', 'signin')}
-                    className="w-full text-center text-gray-700 hover:text-brand-orange font-bold py-2.5 rounded-xl text-sm transition-colors cursor-pointer border border-gray-200 truncate"
-                  >
-                    Sign In
-                  </button>
-                  <button
-                    onClick={() => handleLinkClick('auth', 'signup')}
+                    onClick={() => handleLinkClick('auth')}
                     className="w-full text-center bg-brand-orange text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer truncate"
                   >
-                    Register
+                    Sign In / Register
                   </button>
                 </div>
               )}

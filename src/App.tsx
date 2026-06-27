@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -10,8 +10,11 @@ import ContactView from './components/ContactView';
 import AuthView from './components/AuthView';
 import DashboardView from './components/DashboardView';
 import AdminView from './components/AdminView';
+import TermsView from './components/TermsView';
+import PrivacyView from './components/PrivacyView';
+import NotFoundView from './components/NotFoundView';
 import { CartItem, MenuItem, ViewType, UserProfile, OrderDetails } from './types';
-import { listenMenuItemsFromDb, listenUserOrdersFromDb } from './firebase';
+import { listenMenuItemsFromDb, listenUserOrdersFromDb, listenAppConfigFromDb } from './firebase';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<ViewType>('home');
@@ -26,10 +29,10 @@ export default function App() {
   });
 
   const [isNewUser, setIsNewUser] = useState(false);
-  const [authInitialTab, setAuthInitialTab] = useState<'signin' | 'signup'>('signin');
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showLogoutSuccess, setShowLogoutSuccess] = useState(false);
+  const [deliveryFee, setDeliveryFee] = useState(300); // Default fee
 
   const handleAuthSuccess = (user: UserProfile, newUser = false) => {
     setCurrentUser(user);
@@ -60,6 +63,16 @@ export default function App() {
       setMenuItems(items || []);
     });
 
+    return () => unsubscribe();
+  }, []);
+
+  // Load app config like delivery fee
+  useEffect(() => {
+    const unsubscribe = listenAppConfigFromDb((config) => {
+      if (config && typeof config.deliveryFee === 'number') {
+        setDeliveryFee(config.deliveryFee);
+      }
+    });
     return () => unsubscribe();
   }, []);
 
@@ -124,6 +137,9 @@ export default function App() {
       auth: 'Student & Staff Account Gateway | Campus Foods 🔑',
       dashboard: 'Student Track & Progress Dashboard | Campus Foods 📍',
       admin: 'Administrative Command Centre | Campus Foods 🏢',
+      terms: 'Terms of Service | Campus Foods',
+      privacy: 'Privacy Policy | Campus Foods',
+      not_found: '404 - Page Not Found | Campus Foods',
     };
 
     const descMap: Record<ViewType, string> = {
@@ -134,6 +150,9 @@ export default function App() {
       auth: 'Register as an administrator vendor or log into your secure student portal to request and track live food cups.',
       dashboard: 'Track cooking queue status, view past historical orders, and manage your default hostel room address.',
       admin: 'Manage active cafeteria queues, adjust pricing, delete custom recipes, and analyze administrative profit volumes.',
+      terms: 'Read the terms and conditions for using the Campus Foods delivery service.',
+      privacy: 'Understand how Campus Foods collects, uses, and protects your personal data.',
+      not_found: 'The page you are looking for could not be found.',
     };
 
     document.title = titleMap[currentView] || 'Campus Foods — University Hot Food Delivery';
@@ -241,12 +260,7 @@ export default function App() {
     localStorage.removeItem('campus_foods_cart');
   };
 
-  const handleNavigate = (view: ViewType, authTab?: 'signin' | 'signup') => {
-    if (view === 'auth' && authTab) {
-      setAuthInitialTab(authTab);
-    } else if (view === 'auth') {
-      setAuthInitialTab('signin');
-    }
+  const handleNavigate = (view: ViewType) => {
     setCurrentView(view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -293,6 +307,7 @@ export default function App() {
               onNavigate={handleNavigate}
               currentUser={currentUser}
               onUpdateCartItemCustomizations={handleUpdateCartItemCustomizations}
+              deliveryFee={deliveryFee}
             />
           )}
           {currentView === 'contact' && (
@@ -300,8 +315,6 @@ export default function App() {
           )}
           {currentView === 'auth' && (
             <AuthView 
-              key={authInitialTab}
-              initialTab={authInitialTab}
               onAuthSuccess={handleAuthSuccess} 
               onNavigate={handleNavigate} 
             />
@@ -317,8 +330,6 @@ export default function App() {
             />
           ) : currentView === 'dashboard' ? (
             <AuthView 
-              key={authInitialTab}
-              initialTab={authInitialTab}
               onAuthSuccess={handleAuthSuccess} 
               onNavigate={handleNavigate} 
             />
@@ -329,6 +340,17 @@ export default function App() {
               onNavigate={handleNavigate}
               currentUser={currentUser}
               onSignOut={triggerSignOut}
+            />
+          )}
+          {currentView === 'terms' && (
+            <TermsView />
+          )}
+          {currentView === 'privacy' && (
+            <PrivacyView />
+          )}
+          {!['home', 'menu', 'cart', 'contact', 'auth', 'dashboard', 'admin', 'terms', 'privacy'].includes(currentView) && (
+            <NotFoundView
+              onNavigate={handleNavigate}
             />
           )}
         </ErrorBoundary>

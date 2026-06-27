@@ -2,38 +2,68 @@ rules_version='2'
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // --- Helper Functions ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function userEmail() {
-      return request.auth.token.email;
-    }
-
+    // Check if the requesting user is an admin.
+    // Reads the user's document to check their role.
     function isAdmin() {
       return isSignedIn() &&
-        exists(/databases/$(database)/documents/users/$(userEmail())) &&
-        get(/databases/$(database)/documents/users/$(userEmail())).data.role == 'admin';
+        exists(/databases/$(database)/documents/users/$(request.auth.token.email)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.role == 'admin';
     }
 
-    function isOrderOwner() {
-      return isSignedIn() &&
-        (resource.data.userEmail == userEmail() || (request.resource != null && request.resource.data.userEmail == userEmail()));
+    // Check if the requesting user is the owner of the document.
+    // Compares the user's email with the userEmail field in the document.
+    function isOwner(userEmail) {
+      return request.auth.token.email == userEmail;
     }
 
-    match /menuItems/{document=**} {
+    // --- Collection Rules ---
+
+    // Users can read their own profile, and create/update it.
+    // Admins can read any user profile.
+    match /users/{userEmail} {
+      // Admins can list all users. A user can read their own profile. Admins can read any profile.
+      allow read: if isOwner(userEmail) || isAdmin();
+      // A user can create their own profile, but CANNOT assign themselves the admin role.
+      allow create: if isOwner(userEmail) && request.resource.data.role == 'student';
+      // A user can update their own profile, but CANNOT change their role.
+      // Only an admin can change a user's role.
+      allow update: if (isOwner(userEmail) && request.resource.data.role == resource.data.role) || isAdmin();
+      allow list: if isAdmin();
+      // Admins can delete users, but not themselves.
+      allow delete: if isAdmin() && request.auth.token.email != userEmail;
+    }
+
+    // Any signed-in user can view the menu. Only admins can change it.
+    match /menuItems/{item} {
       allow read: if isSignedIn();
       allow create, update, delete: if isAdmin();
     }
 
-    match /orders/{document=**} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isAdmin();
+    // Users can create their own orders.
+    // Users can read their own orders, Admins can read all orders.
+    // Only Admins can update (e.g., status) or delete orders.
+    match /orders/{orderId} {
+      allow create: if isSignedIn() && isOwner(request.resource.data.userEmail);
+      allow read: if isAdmin() || isOwner(resource.data.userEmail);
+      allow update, delete: if isAdmin();
     }
 
-    match /{document=**} {
-      // Development fallback: permit reads until July 24, 2026.
-      allow read: if request.time < timestamp.date(2026, 7, 24);
+    // Config can be read by any signed-in user, but only written by admins.
+    match /config/{doc} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Any signed-in user can send a contact message. Only admins can read them.
+    match /contactMessages/{messageId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isAdmin();
     }
   }
 }

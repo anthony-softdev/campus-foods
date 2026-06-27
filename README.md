@@ -23,7 +23,7 @@
 
 - **🛍️ Student Ordering Flow:** Browse a dynamic menu, add items to the cart, and place orders seamlessly.
 - **✍️ Inline Customization:** Edit meal options directly within the cart for a personalized experience.
-- **🔐 Secure Authentication:** Robust user sign-up and sign-in using Email/Password and Google OAuth. Includes password recovery.
+- **🔐 Secure Authentication:** Robust user sign-up and sign-in using Google OAuth for a seamless and secure experience.
 - **👤 User Dashboard:** Registered students can view their order history and track the status of current orders.
 - **⚙️ Admin Command Centre:** A comprehensive portal for restaurant staff.
   - **📊 Live Analytics:** View key metrics like total sales, pending orders, and popular items.
@@ -49,21 +49,20 @@
     - **Firestore:** Real-time NoSQL database for orders, users, and menu items.
     - **Firebase Authentication:** For user management and secure login.
     - **Firebase Data Connect:** (Setup included) For type-safe data access between your app and backend.
-- **Utilities:**
-  - `bcryptjs` for client-side password hashing.
 
 ---
 
 ## 🔑 Admin Access
 
-To access the administrative dashboard:
+Admin accounts are managed through the Admin Dashboard. The flow is as follows:
 
-1.  Navigate to the registration page.
-2.  Fill out the registration form.
-3.  Click on the "Are you a staff member? Register here →" link.
-4.  Enter the `VITE_ADMIN_INVITE_CODE` you set in your `.env` file.
-5.  Complete the registration.
-6.  Log in with your new admin credentials. The "My Dashboard" button will now be an "Admin Portal" button.
+1.  **Initial Admin:** The first admin account must be created manually in the Firebase Console.
+    - Go to your Firestore `users` collection.
+    - Create a new document for the admin user (or edit an existing one).
+    - Set the `email` field to the admin's email and ensure the `role` field is set to `"admin"`.
+2.  **Register as a Student:** All subsequent staff members should first register a normal student account through the app's registration page.
+3.  **Promote to Admin:** An existing admin can then log in, go to the **Admin Dashboard**, navigate to the **User Management** tab, find the new user, and change their role from "student" to "admin".
+4.  The promoted user will have admin access on their next login.
 
 ---
 

@@ -43,17 +43,17 @@ export default function HomeView({ onNavigate, cart, onAddToCart, onUpdateCartQu
       stars: 5
     },
     {
-      name: 'Fatima B.',
-      initials: 'FB',
-      role: 'Moremi Hall resident',
+      name: 'Andrew B.',
+      initials: 'AB',
+      role: 'Faculty of Engineering (100L)',
       text: 'The Chapman drink is cold and tastes exactly like the ones they serve in top restaurants. Delivery is super fast, 10/10 recommended for hostel life!',
-      bg: 'bg-amber-100 text-amber-700',
+      bg: 'bg-yellow-100 text-yellow-700',
       stars: 5
     },
     {
-      name: 'Tunde O.',
-      initials: 'TO',
-      role: 'Faculty of Sciences (400L)',
+      name: 'Jennifer O.',
+      initials: 'JO',
+      role: 'Faculty of Medicine (200L)',
       text: 'Their customer service is incredible. Real quick delivery even during evening rain, and the Shawarma is gigantic filled with cream and chicken.',
       bg: 'bg-rose-100 text-rose-700',
       stars: 5

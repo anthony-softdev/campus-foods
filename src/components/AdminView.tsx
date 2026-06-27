@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   TrendingUp, ShoppingBag, Clock, CheckCircle2, Truck, 
-  Trash2, RotateCcw, Layers, Package,
+  Trash2, RotateCcw, Layers, Package, Users, XCircle, Search, ChevronLeft, ChevronRight, Download,
   AlertCircle, Sparkles,
   DollarSign, LogOut
 } from 'lucide-react';
@@ -11,11 +11,13 @@ import {
   listenAllOrdersFromDb, 
   clearAllOrdersFromDb,
   deleteOrderFromDb,
+  listenAllUsersFromDb,
   listenAppConfigFromDb,
   updateDeliveryFeeInDb,
+  updateOrderStatusInDb,
 } from '../firebase';
 import AdminMenuView from './AdminMenuView';
-import AdminOrdersView from './AdminOrdersView';
+import AdminUsersView from './AdminUsersView';
 
 // Inferred types from other components since types.ts is not provided.
 // This helps fix type errors within this file.
@@ -40,7 +42,210 @@ interface AdminViewProps {
   onSignOut: () => void;
 }
 
-type AdminTab = 'orders' | 'menu' | 'analytics';
+type AdminTab = 'orders' | 'menu' | 'users' | 'analytics';
+
+const ORDER_STATUSES: OrderDetails['status'][] = ['Placed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'];
+
+function AdminOrdersView({ orders, isLoading, onDeleteOrder, onClearAllOrders, onShowToast }: {
+  orders: OrderDetails[];
+  isLoading: boolean;
+  onDeleteOrder: (orderId: string) => void;
+  onClearAllOrders: () => void;
+  onShowToast: (message: string, type: 'success' | 'error' | 'warning') => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<OrderDetails['status'] | 'all'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+  const [, forceUpdate] = useState(0);
+
+  const handleExportCSV = () => {
+    if (filteredOrders.length === 0) {
+      onShowToast('No orders to export.', 'warning');
+      return;
+    }
+
+    const headers = ['Order ID', 'Date', 'Customer Name', 'Phone Number', 'Delivery Location', 'Room Number', 'Status', 'Total (₦)', 'Items'];
+
+    const formatItems = (items: CartItem[]) => {
+      return items.map(cartItem => {
+        let itemString = `${cartItem.quantity}x ${cartItem.item.name}`;
+        if (cartItem.customizations) {
+          const customParts = Object.entries(cartItem.customizations).flatMap(([optionId, choices]) => {
+            const option = cartItem.item.customOptions?.find(o => o.id === optionId);
+            if (!option) return [];
+            return Object.entries(choices).map(([choiceValue, quantity]) => {
+              if (quantity === 0) return null;
+              const choice = option.choices.find(c => String(c.value) === String(choiceValue));
+              const choiceLabel = choice ? choice.label : String(choiceValue);
+              if (quantity > 1) {
+                return `${quantity}x ${choiceLabel}`;
+              }
+              return choiceLabel;
+            });
+          }).filter(Boolean);
+
+          if (customParts.length > 0) {
+            itemString += ` (${customParts.join(', ')})`;
+          }
+        }
+        return itemString;
+      }).join('; ');
+    };
+
+    const rows = filteredOrders.map(order => [order.id, new Date(order.createdAt).toLocaleString(), order.fullName, order.phoneNumber, order.deliveryLocation, order.roomNumber, order.status, order.total, formatItems(order.items)]);
+
+    const escapeCsvField = (field: any) => {
+      const stringField = String(field);
+      if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+        return `"${stringField.replace(/"/g, '""')}"`;
+      }
+      return stringField;
+    };
+
+    let csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(row => row.map(escapeCsvField).join(','))].join('\r\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `campus_foods_orders_${new Date().toISOString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    onShowToast('Export started successfully!', 'success');
+  };
+
+  const handleStatusChange = async (orderId: string, newStatus: OrderDetails['status']) => {
+    if (window.confirm(`Are you sure you want to change this order's status to "${newStatus}"?`)) {
+      try {
+        await updateOrderStatusInDb(orderId, newStatus);
+        onShowToast(`Order status updated to "${newStatus}".`, 'success');
+      } catch (error) {
+        console.error('Error updating status:', error);
+        onShowToast('Failed to update order status.', 'error');
+      }
+    } else {
+      // If user cancels, force a re-render to reset the select input to its original value
+      forceUpdate(c => c + 1);
+    }
+  };
+
+  const filteredOrders = useMemo(() => {
+    const filtered = orders.filter(order => {
+      const matchesSearch =
+        order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.phoneNumber.includes(searchQuery);
+      const matchesFilter = statusFilter === 'all' || order.status === statusFilter;
+      return matchesSearch && matchesFilter;
+    });
+    setCurrentPage(1); // Reset page on filter change
+    return filtered;
+  }, [orders, searchQuery, statusFilter]);
+
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredOrders.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredOrders, currentPage]);
+  const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE);
+
+  if (isLoading) {
+    return <div className="text-center p-8 text-gray-500">Loading orders...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white border border-orange-100/50 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="relative flex-grow max-w-md">
+          <Search size={16} className="absolute left-3.5 top-3.5 text-gray-400" />
+          <input type="text" placeholder="Search by Order ID, Name, or Phone..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#fff9f2]/30 hover:bg-[#fff9f2]/60 focus:bg-white text-xs pl-10 pr-4 py-3 rounded-2xl border border-orange-100 outline-none transition-all text-[#1a1a1a] font-sans font-semibold" />
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-sans font-bold text-gray-400">Filter by status:</span>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="bg-[#fff9f2]/40 rounded-2xl border border-orange-100 px-4 py-2.5 text-xs font-sans font-bold text-[#1a1a1a] outline-none">
+              <option value="all">All Statuses</option>
+              {ORDER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <button onClick={onClearAllOrders} className="px-4 py-2.5 bg-red-50 text-red-600 border border-red-100 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-red-100 transition-colors">
+            <XCircle size={14} /> Clear History
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border border-orange-100/60 rounded-3xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left font-sans">
+            <thead className="bg-orange-50/50 text-[10px] text-gray-500 uppercase tracking-wider">
+              <tr>
+                <th scope="col" className="px-6 py-3">Order Details</th>
+                <th scope="col" className="px-6 py-3">Customer</th>
+                <th scope="col" className="px-6 py-3">Items</th>
+                <th scope="col" className="px-6 py-3">Total</th>
+                <th scope="col" className="px-6 py-3">Status</th>
+                <th scope="col" className="px-6 py-3"><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedOrders.map(order => (
+                <tr key={order.id} className="border-b border-orange-100/50 hover:bg-orange-50/30 transition-colors align-top">
+                  <td className="px-6 py-4"><div className="font-mono font-bold text-brand-dark">{order.id}</div><div className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleString()}</div></td>
+                  <td className="px-6 py-4"><div className="font-bold text-gray-800">{order.fullName}</div><div className="text-xs text-gray-500">{order.deliveryLocation} - {order.roomNumber}</div></td>
+                  <td className="px-6 py-4 text-xs text-gray-600">
+                    <ul className="space-y-1.5">
+                      {order.items.map((cartItem) => (
+                        <li key={cartItem.cartId}>
+                          <div className="font-bold text-gray-800">{cartItem.quantity}x {cartItem.item.name}</div>
+                          {cartItem.customizations && Object.keys(cartItem.customizations).length > 0 && (
+                            <ul className="pl-4 mt-1 space-y-0.5 list-disc list-inside">
+                              {Object.entries(cartItem.customizations).flatMap(([optionId, choices]) => {
+                                const option = cartItem.item.customOptions?.find(o => o.id === optionId);
+                                return Object.entries(choices).map(([choiceValue, quantity]) => {
+                                  if (quantity === 0) return null;
+                                  const choice = option?.choices.find(c => String(c.value) === String(choiceValue));
+                                  const choiceLabel = choice ? choice.label : String(choiceValue);
+                                  return (
+                                    <li key={`${optionId}-${choiceValue}`} className="text-gray-500 capitalize">{quantity > 1 ? `${quantity}x ` : ''}{choiceLabel}</li>
+                                  );
+                                });
+                              })}
+                            </ul>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </td>
+                  <td className="px-6 py-4 font-bold text-gray-800">₦{order.total.toLocaleString()}</td>
+                  <td className="px-6 py-4">
+                    <select value={order.status} onChange={(e) => handleStatusChange(order.id, e.target.value as OrderDetails['status'])} className="bg-white border border-gray-200 rounded-lg text-xs font-bold p-2 outline-none focus:border-brand-orange">
+                      {ORDER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button onClick={() => onDeleteOrder(order.id)} className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"><Trash2 size={14} /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {paginatedOrders.length === 0 && <div className="text-center p-8 text-gray-500">No orders found.</div>}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center text-xs font-sans font-semibold text-gray-500 mt-4">
+          <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-4 py-2 bg-white border border-gray-200 rounded-xl flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors">
+            <ChevronLeft size={14} /> Previous
+          </button>
+          <span>Page {currentPage} of {totalPages}</span>
+          <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-4 py-2 bg-white border border-gray-200 rounded-xl flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors">
+            Next <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminView({ menuItems, onNavigate, currentUser, onSignOut }: AdminViewProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('orders');
@@ -49,6 +254,7 @@ export default function AdminView({ menuItems, onNavigate, currentUser, onSignOu
 
   // Toast notifications state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning') => {
     setToast({ message, type });
@@ -66,6 +272,7 @@ export default function AdminView({ menuItems, onNavigate, currentUser, onSignOu
   // Load orders from Firestore using real-time database listener
   const [orders, setOrders] = useState<OrderDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [users, setUsers] = useState<UserProfile[]>([]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -78,6 +285,13 @@ export default function AdminView({ menuItems, onNavigate, currentUser, onSignOu
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (currentUser?.role === 'admin') {
+      const unsubscribe = listenAllUsersFromDb(setUsers);
+      return () => unsubscribe();
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     const unsubscribe = listenAppConfigFromDb((config) => {
@@ -109,12 +323,15 @@ export default function AdminView({ menuItems, onNavigate, currentUser, onSignOu
       return;
     }
     if (window.confirm("Are you absolutely sure you want to CLEAR the entire order queue history? This action is irreversible!")) {
+      setIsClearing(true);
       try {
         await clearAllOrdersFromDb();
         showToast("Order history directory has been completely wiped!", 'success');
       } catch (err) {
         console.error("Error clearing all orders:", err);
         showToast("Failed to clear order history from the database.", "error");
+      } finally {
+        setIsClearing(false);
       }
     }
   };
@@ -163,8 +380,8 @@ export default function AdminView({ menuItems, onNavigate, currentUser, onSignOu
       if (o.status === 'Delivered') {
         sales += o.total;
         completed += 1;
-      } else {
-        pending += 1;
+      } else if (o.status !== 'Cancelled') {
+        pending += 1; // Count active orders (Placed, Preparing, Out for Delivery)
       }
 
       o.items.forEach(ci => {
@@ -321,11 +538,11 @@ export default function AdminView({ menuItems, onNavigate, currentUser, onSignOu
               <Clock size={20} className="stroke-[2.5]" />
             </div>
             <div className="space-y-0.5 min-w-0">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">Cooking/Queued</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">Active Orders</p>
               <p className="text-xl sm:text-2xl font-display font-black text-brand-dark truncate">
                 {stats.pending}
               </p>
-              <p className="text-[10px] text-gray-400 font-sans truncate">Active preparation cycles</p>
+              <p className="text-[10px] text-gray-400 font-sans truncate">In queue, cooking, or out for delivery</p>
             </div>
           </div>
 
@@ -386,6 +603,17 @@ export default function AdminView({ menuItems, onNavigate, currentUser, onSignOu
             Kitchen Catalog ({menuItems.length})
           </button>
           <button
+            onClick={() => setActiveTab('users')}
+            className={`py-3 px-6 text-sm font-sans font-bold flex items-center gap-2 border-b-2 transition-all shrink-0 ${
+              activeTab === 'users'
+                ? 'border-brand-orange text-brand-orange bg-[#fffbf7]'
+                : 'border-transparent text-gray-400 hover:text-gray-700'
+            }`}
+          >
+            <Users size={16} />
+            User Management ({users.length})
+          </button>
+          <button
             onClick={() => setActiveTab('analytics')}
             className={`py-3 px-6 text-sm font-sans font-bold flex items-center gap-2 border-b-2 transition-all shrink-0 ${
               activeTab === 'analytics'
@@ -413,6 +641,7 @@ export default function AdminView({ menuItems, onNavigate, currentUser, onSignOu
                 onDeleteOrder={handleDeleteOrder}
                 onClearAllOrders={handleClearAllOrders}
                 onShowToast={showToast}
+                key={orders.length} // Re-mount component when orders change to reset filters
               />
             </motion.div>
           )}
@@ -425,6 +654,21 @@ export default function AdminView({ menuItems, onNavigate, currentUser, onSignOu
               exit={{ opacity: 0, y: -10 }}
             >
               <AdminMenuView onShowToast={showToast} />
+            </motion.div>
+          )}
+
+          {activeTab === 'users' && (
+            <motion.div
+              key="users-tab"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <AdminUsersView
+                users={users}
+                currentUserEmail={currentUser.email}
+                onShowToast={showToast}
+              />
             </motion.div>
           )}
 

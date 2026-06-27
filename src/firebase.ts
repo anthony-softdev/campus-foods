@@ -111,6 +111,59 @@ export async function saveUserProfileToDb(email: string, profile: any): Promise<
   }
 }
 
+export async function updateUserRoleInDb(email: string, role: 'student' | 'admin'): Promise<void> {
+  const userKey = email.toLowerCase().trim();
+  const path = `users/${userKey}`;
+  try {
+    const docRef = doc(db, 'users', userKey);
+    await updateDoc(docRef, { role });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function updateUserLastSeenInDb(email: string): Promise<void> {
+  const userKey = email.toLowerCase().trim();
+  const path = `users/${userKey}`;
+  try {
+    const docRef = doc(db, 'users', userKey);
+    await updateDoc(docRef, { lastSeen: new Date().toISOString() });
+  } catch (error) {
+    // This is a non-critical update, so we'll just log the error
+    // instead of throwing it and potentially breaking the login flow.
+    console.error(`Failed to update lastSeen for ${path}:`, error);
+  }
+}
+
+export async function deleteUserFromDb(email: string): Promise<void> {
+  const userKey = email.toLowerCase().trim();
+  const path = `users/${userKey}`;
+  try {
+    const docRef = doc(db, 'users', userKey);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+export function listenAllUsersFromDb(callback: (users: UserProfile[]) => void) {
+  const path = 'users';
+  const q = query(collection(db, 'users'));
+  return onSnapshot(q, (snapshot) => {
+    const users: UserProfile[] = [];
+    snapshot.forEach((doc) => {
+      // Ensure we have a valid UserProfile structure
+      const data = doc.data();
+      if (data.email && data.fullName) {
+        users.push(data as UserProfile);
+      }
+    });
+    callback(users);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, path);
+  });
+}
+
 // --- Menu Items helpers ---
 export function listenMenuItemsFromDb(callback: (items: MenuItem[]) => void) {
   const path = 'menuItems';

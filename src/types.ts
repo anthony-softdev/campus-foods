@@ -14,8 +14,6 @@ export interface MenuCustomizationOption {
   choices: MenuCustomizationChoice[];
 }
 
-export type MenuItemCustomizations = Record<string, string | number>;
-
 export interface MenuItem {
   id: string;
   name: string;
@@ -24,6 +22,7 @@ export interface MenuItem {
   description: string;
   image: string;
   popular?: boolean;
+  inStock?: boolean;
   customOptions?: MenuCustomizationOption[];
 }
 
@@ -31,7 +30,7 @@ export interface CartItem {
   cartId: string;
   item: MenuItem;
   quantity: number;
-  customizations?: MenuItemCustomizations;
+  customizations?: Record<string, Record<string, number>>;
 }
 
 export type PaymentMethod = 'card' | 'transfer' | 'delivery';
@@ -48,7 +47,7 @@ export interface OrderDetails {
   subtotal: number;
   deliveryFee: number;
   total: number;
-  status: 'Placed' | 'Preparing' | 'Out for Delivery' | 'Delivered';
+  status: 'Placed' | 'Preparing' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
   userEmail?: string;
   createdAt: string;
 }
@@ -62,7 +61,7 @@ export interface UserProfile {
   deliveryLocation: string;
   roomNumber: string;
   role?: 'admin' | 'student';
+  lastSeen?: string;
 }
 
-export type ViewType = 'home' | 'menu' | 'cart' | 'contact' | 'auth' | 'dashboard' | 'admin';
-
+export type ViewType = 'home' | 'menu' | 'cart' | 'contact' | 'auth' | 'dashboard' | 'admin' | 'terms' | 'privacy' | 'not_found';

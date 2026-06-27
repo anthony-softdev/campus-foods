@@ -306,12 +306,6 @@ export default function CartView({
     try {
       // 1. Write order directly to cloud Firestore database
       await createOrderInDb(newOrder);
-
-      // 2. Local fallback storage cache
-      const storedOrders = localStorage.getItem('campus_foods_orders');
-      const allOrders = storedOrders ? JSON.parse(storedOrders) : [];
-      allOrders.push(newOrder);
-      localStorage.setItem('campus_foods_orders', JSON.stringify(allOrders));
     } catch (e) {
       console.error('Error recording order in Firestore:', e);
     }

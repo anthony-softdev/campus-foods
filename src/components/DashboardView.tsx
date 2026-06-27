@@ -94,17 +94,6 @@ export default function DashboardView({
       // 2. Persist profile changes synchronously to Firestore users database
       await saveUserProfileToDb(currentUser.email, updatedProfile);
 
-      // 3. Fallback: Update local storage registered users pool
-      const usersJson = localStorage.getItem('campus_foods_users');
-      if (usersJson) {
-        let users = JSON.parse(usersJson);
-        const updatedUsers = users.map((u: any) => 
-          u.email.toLowerCase() === currentUser.email.toLowerCase()
-            ? { ...u, fullName: updatedProfile.fullName, phoneNumber: updatedProfile.phoneNumber, deliveryLocation: updatedProfile.deliveryLocation, roomNumber: updatedProfile.roomNumber }
-            : u
-        );
-        localStorage.setItem('campus_foods_users', JSON.stringify(updatedUsers));
-      }
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err) {

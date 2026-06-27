@@ -88,6 +88,22 @@ export default function Footer({ onNavigate, currentUser }: FooterProps) {
                   </button>
                 </li>
               )}
+              <li>
+                <button 
+                  onClick={() => handleLinkClick('terms')} 
+                  className="hover:text-brand-orange cursor-pointer transition-colors duration-200 block text-left w-full"
+                >
+                  Terms of Service
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleLinkClick('privacy')} 
+                  className="hover:text-brand-orange cursor-pointer transition-colors duration-200 block text-left w-full"
+                >
+                  Privacy Policy
+                </button>
+              </li>
             </ul>
           </div>
 
