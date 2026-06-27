@@ -338,7 +338,7 @@ export default function CartView({
   };
 
   return (
-    <div className="pt-20 sm:pt-24 pb-12 sm:pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-fadeIn">
+    <div className="pt-20 sm:pt-24 pb-32 xl:pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-fadeIn">
       
       {/* Title block */}
       <div className="border-b border-orange-100 pb-4">
@@ -376,7 +376,7 @@ export default function CartView({
                   const perUnit = cartItem.item.price + getCustomizationExtra(cartItem);
                   const itemTotal = perUnit * cartItem.quantity;
                   return (
-                    <div key={cartItem.cartId} className="py-4 flex flex-wrap items-start justify-between gap-4 animate-fadeIn">
+                    <div key={cartItem.cartId} className="py-4 flex flex-col sm:flex-row sm:flex-wrap items-start justify-between gap-4 animate-fadeIn">
                       
                       {/* Product details (Image + Name + unit price) */}
                       <div className="flex items-center gap-3.5 flex-1 min-w-0">
@@ -480,7 +480,7 @@ export default function CartView({
                       )}
 
                       {/* Controls and Actions row */}
-                      <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 shrink-0">
+                      <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-3 sm:gap-6 shrink-0 mt-3 sm:mt-0">
                         
                         {/* +/- controls */}
                         <div className="flex items-center bg-orange-50/50 border border-orange-100/50 rounded-2xl p-1 shrink-0">
@@ -501,22 +501,24 @@ export default function CartView({
                           </button>
                         </div>
 
-                        {/* Calculated total for this item */}
-                        <div className="text-right sm:min-w-[80px]">
-                          <span className="text-[10px] text-gray-400 block uppercase tracking-wider font-bold sm:hidden">Subtotal</span>
-                          <span className="text-xs sm:text-sm font-sans font-extrabold text-brand-dark">
-                            ₦{itemTotal.toLocaleString()}
-                          </span>
-                        </div>
+                        <div className="flex items-center gap-3 sm:gap-6">
+                          {/* Calculated total for this item */}
+                          <div className="text-right sm:min-w-[80px]">
+                            <span className="text-[10px] text-gray-400 block uppercase tracking-wider font-bold sm:hidden">Subtotal</span>
+                            <span className="text-xs sm:text-sm font-sans font-extrabold text-brand-dark">
+                              ₦{itemTotal.toLocaleString()}
+                            </span>
+                          </div>
 
-                        {/* Trash action */}
-                        <button
-                          onClick={() => onRemoveFromCart(cartItem.cartId)}
-                          className="p-2 text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50 transition-colors cursor-pointer"
-                          title="Remove item"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                          {/* Trash action */}
+                          <button
+                            onClick={() => onRemoveFromCart(cartItem.cartId)}
+                            className="p-2 text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Remove item"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
 
                     </div>
@@ -944,8 +946,8 @@ export default function CartView({
                 {currentUser ? (
                   <button
                     type="button"
-                    onClick={() => handlePlaceOrder()}
-                    className="w-full text-center bg-brand-orange hover:bg-[#e07f00] text-white font-sans font-extrabold py-4 px-6 rounded-2xl transition-all duration-300 shadow-xl shadow-orange-200 hover:scale-[1.02] active:scale-95 text-base flex items-center justify-center gap-2 cursor-pointer"
+                    onClick={handlePlaceOrder}
+                    className="w-full text-center bg-brand-orange hover:bg-[#e07f00] text-white font-sans font-extrabold py-4 px-6 rounded-2xl transition-all duration-300 shadow-xl shadow-orange-200 hover:scale-[1.02] active:scale-95 text-base hidden xl:flex items-center justify-center gap-2 cursor-pointer"
                   >
                     Place Order 🚀
                   </button>
@@ -953,7 +955,7 @@ export default function CartView({
                   <button
                     type="button"
                     onClick={() => onNavigate('auth')}
-                    className="w-full text-center bg-[#1a1a1a] hover:bg-gray-800 text-white font-sans font-extrabold py-4 px-6 rounded-2xl transition-all duration-300 shadow-xl shadow-gray-200 hover:scale-[1.02] active:scale-95 text-base flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full text-center bg-[#1a1a1a] hover:bg-gray-800 text-white font-sans font-extrabold py-4 px-6 rounded-2xl transition-all duration-300 shadow-xl shadow-gray-200 hover:scale-[1.02] active:scale-95 text-base hidden xl:flex items-center justify-center gap-2 cursor-pointer"
                   >
                     Sign In to Place Order 🔑
                   </button>
@@ -1019,6 +1021,33 @@ export default function CartView({
           >
             Start Ordering delicious foods
           </button>
+        </div>
+      )}
+
+      {/* STICKY FOOTER FOR MOBILE CHECKOUT */}
+      {cart.length > 0 && (
+        <div className="xl:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-t border-gray-200 p-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] animate-fadeIn">
+          <div className="flex justify-between items-center mb-3">
+              <span className="font-sans font-bold text-sm text-gray-700">Total Bill:</span>
+              <span className="font-display font-extrabold text-brand-orange text-xl">₦{total.toLocaleString()}</span>
+          </div>
+          {currentUser ? (
+              <button
+                  type="button"
+                  onClick={handlePlaceOrder}
+                  className="w-full text-center bg-brand-orange hover:bg-[#e07f00] text-white font-sans font-extrabold py-3.5 rounded-xl transition-all text-base flex items-center justify-center gap-2 cursor-pointer"
+              >
+                  Place Order 🚀
+              </button>
+          ) : (
+              <button
+                  type="button"
+                  onClick={() => onNavigate('auth')}
+                  className="w-full text-center bg-[#1a1a1a] hover:bg-gray-800 text-white font-sans font-extrabold py-3.5 rounded-xl transition-all text-base flex items-center justify-center gap-2 cursor-pointer"
+              >
+                  Sign In to Place Order 🔑
+              </button>
+          )}
         </div>
       )}
 
