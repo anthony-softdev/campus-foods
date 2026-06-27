@@ -88,7 +88,36 @@ campus-foods/
 
 ---
 
-## 🔗 Firebase Data Connect
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js (v18 or later recommended)
+- A package manager like `pnpm`, `npm`, or `yarn`
+
+### Installation & Setup
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/anthony-softdev/campus-foods.git
+    cd campus-foods
+    ```
+
+2.  **Install dependencies:**
+    ```bash
+    pnpm install # or npm install / yarn install
+    ```
+
+3.  **Set up Environment Variables:**
+    - Create a `.env` file in the project root by copying the contents of `.env.example`.
+    - **Client-side keys:** Fill in your Firebase project's web app configuration (the variables prefixed with `VITE_`). You can find these in your Firebase project settings.
+    - **Admin SDK keys:** For backend development (e.g., Firebase Functions), you'll need service account credentials.
+      1.  In the Firebase console, go to **Project settings > Service accounts**.
+      2.  Click **Generate new private key**. This will download a JSON file.
+      3.  Copy the `project_id`, `private_key`, and `client_email` values from this file into your `.env` file.
+      4.  **Important:** Keep the downloaded JSON file safe and do not commit it.
+
+## � Firebase Data Connect
 
 This project is configured to use **Firebase Data Connect**, a type-safe GraphQL-based data access layer. The generated SDK and documentation can be found in the `src/dataconnect-generated` directory.
 
