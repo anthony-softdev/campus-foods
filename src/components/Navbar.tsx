@@ -71,16 +71,10 @@ export default function Navbar({ currentView, onNavigate, cartCount, currentUser
           {/* LOGO */}
           <div 
             onClick={handleHomeClick} 
-            className="flex items-center space-x-2 cursor-pointer group select-none"
+            className="flex items-center cursor-pointer group select-none"
             id="nav-logo"
           >
-            <div className="w-10 h-10 rounded-xl bg-brand-orange flex items-center justify-center text-white group-hover:scale-105 transition-transform duration-200">
-              <Utensils size={20} className="stroke-[2.5]" />
-            </div>
-            <span className="font-display font-extrabold text-xl tracking-tight">
-              <span className="text-[#1a1a1a]">Campus</span>
-              <span className="text-brand-orange"> Foods</span>
-            </span>
+            <img src="/assets/campus-foods-logo-text.png" alt="Campus Foods Logo" className="h-20 w-auto group-hover:scale-105 transition-transform duration-200" />
           </div>
 
           {/* DESKTOP NAV LINKS (CENTER) */}

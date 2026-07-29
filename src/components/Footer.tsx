@@ -20,17 +20,10 @@ export default function Footer({ onNavigate, currentUser }: FooterProps) {
           {/* Brand Info */}
           <div className="col-span-1 md:col-span-1.5 space-y-4">
             <div 
-              onClick={() => handleLinkClick('home')} 
-              className="flex items-center space-x-2 cursor-pointer select-none"
+              onClick={() => handleLinkClick('home')}
+              className="flex items-center cursor-pointer select-none"
             >
-              <div className="w-9 h-9 rounded-full bg-orange-500/10 flex items-center justify-center text-brand-orange">
-                <Utensils size={18} />
-              </div>
-              <span className="font-display font-extrabold text-xl tracking-tight">
-                <span className="text-white">Campus</span>
-                <span className="text-brand-orange">Foods</span>
-                <span className="text-brand-orange ml-1">🍽️</span>
-              </span>
+              <img src="/assets/campus-foods-logo-text.png" alt="Campus Foods Logo" className="h-25 w-auto" />
             </div>
             
             <p className="text-sm font-sans leading-relaxed text-gray-400">
