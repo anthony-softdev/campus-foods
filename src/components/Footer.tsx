@@ -1,5 +1,6 @@
 import { Utensils, Instagram, MessageCircle, Heart } from 'lucide-react';
 import { UserProfile, ViewType } from '../types';
+import logo from '../../assets/campus-foods-logo-text.png';
 
 interface FooterProps {
   onNavigate: (view: ViewType) => void;
@@ -23,7 +24,7 @@ export default function Footer({ onNavigate, currentUser }: FooterProps) {
               onClick={() => handleLinkClick('home')}
               className="flex items-center cursor-pointer select-none"
             >
-              <img src="/assets/campus-foods-logo-text.png" alt="Campus Foods Logo" className="h-25 w-auto" />
+              <img src={logo} alt="Campus Foods Logo" className="h-25 w-auto" />
             </div>
             
             <p className="text-sm font-sans leading-relaxed text-gray-400">

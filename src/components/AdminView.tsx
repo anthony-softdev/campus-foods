@@ -6,7 +6,7 @@ import {
   DollarSign, LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MenuItem, OrderDetails, ViewType, UserProfile, Category } from '../types';
+import { MenuItem, OrderDetails, ViewType, UserProfile, Category, CartItem } from '../types';
 import { 
   listenAllOrdersFromDb, 
   clearAllOrdersFromDb,

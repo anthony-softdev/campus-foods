@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ShoppingBag, Menu, X, Phone, Info, Home, Utensils, User, LogOut } from 'lucide-react';
 import { ViewType, UserProfile } from '../types';
+import logo from '../../assets/campus-foods-logo-text.png';
 
 interface NavbarProps {
   currentView: ViewType;
@@ -74,7 +75,7 @@ export default function Navbar({ currentView, onNavigate, cartCount, currentUser
             className="flex items-center cursor-pointer group select-none"
             id="nav-logo"
           >
-            <img src="/assets/campus-foods-logo-text.png" alt="Campus Foods Logo" className="h-20 w-auto group-hover:scale-105 transition-transform duration-200" />
+            <img src={logo} alt="Campus Foods Logo" className="h-20 w-auto group-hover:scale-105 transition-transform duration-200" />
           </div>
 
           {/* DESKTOP NAV LINKS (CENTER) */}
