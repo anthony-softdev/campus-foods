@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Search, Plus, Edit2, Trash2, Check, X, Image as ImageIcon, Info
+  Search, Plus, Edit2, Trash2, Check, X, Image as ImageIcon, Info, Utensils, AlertCircle
 } from 'lucide-react';
 import { MenuItem, Category } from '../types';
 import {
@@ -9,18 +9,19 @@ import {
   listenMenuItemsFromDb,
 } from '../firebase';
 
+// `value`/`id` are optional here because, while editing, they don't exist yet —
+// they're auto-derived from the label text at save time (see toCamelSlug /
+// buildCustomOptionsForSave), the same way the dish ID is auto-derived from
+// the dish name. Admins never type a raw internal slug by hand.
 interface MenuCustomizationChoice {
-  value: string | number;
+  value?: string | number;
   label: string;
   price: number;
 }
 
-type CustomOptionMode = 'choice' | 'quantity';
-
 interface MenuCustomizationOption {
-  id: string;
+  id?: string;
   label: string;
-  mode: CustomOptionMode;
   choices: MenuCustomizationChoice[];
 }
 
@@ -39,6 +40,29 @@ const generateMenuItemId = (name: string, category: Category) => {
     return `${prefix}-${Date.now().toString(36)}`;
   }
   return id;
+};
+
+// Turns a free-text label into a short internal camelCase key, e.g.
+// "Extra Portion" -> "extraPortion". Used for both option IDs and choice
+// values so admins only ever type the label customers actually see.
+const toCamelSlug = (text: string): string => {
+  const words = text.trim().replace(/[^a-zA-Z0-9\s]+/g, ' ').split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+  return words.map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase())).join('');
+};
+
+// Appends "2", "3", ... to `base` until it no longer collides with `used`,
+// then records it. Keeps auto-generated option/choice keys unique per item
+// even if two choices share a label (e.g. two "Extra" choices).
+const dedupeSlug = (base: string, used: string[]): string => {
+  const root = base || 'option';
+  let candidate = root;
+  let n = 2;
+  while (used.includes(candidate)) {
+    candidate = `${root}${n++}`;
+  }
+  used.push(candidate);
+  return candidate;
 };
 
 export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
@@ -77,6 +101,22 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
   });
   const [customOptionErrors, setCustomOptionErrors] = useState<Record<number, Record<string, string>>>({});
 
+  // Live preview for the pasted image URL. Debounced so a broken-image icon
+  // doesn't flash on every keystroke while the admin is still typing/pasting.
+  const [imagePreviewSrc, setImagePreviewSrc] = useState('');
+  const [imagePreviewError, setImagePreviewError] = useState(false);
+
+  useEffect(() => {
+    setImagePreviewError(false);
+    const url = formData.image.trim();
+    if (!url) {
+      setImagePreviewSrc('');
+      return;
+    }
+    const timer = setTimeout(() => setImagePreviewSrc(url), 400);
+    return () => clearTimeout(timer);
+  }, [formData.image]);
+
   const openEditModal = (item: MenuItem) => {
     setCustomOptionErrors({});
     setEditingItem(item);
@@ -114,6 +154,22 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
     setIsAddingNew(false);
   };
 
+  // Turns the editable formData.customOptions (labels only) into the final
+  // saved shape, deriving a unique `id`/`value` slug from each label.
+  const buildCustomOptionsForSave = (options: MenuCustomizationOption[]) => {
+    const usedOptionIds: string[] = [];
+    return options.map((option) => {
+      const optionId = dedupeSlug(toCamelSlug(option.label), usedOptionIds);
+      const usedChoiceValues: string[] = [];
+      const choices = option.choices.map((choice) => ({
+        label: choice.label.trim(),
+        value: dedupeSlug(toCamelSlug(choice.label), usedChoiceValues),
+        price: Number(choice.price) || 0,
+      }));
+      return { id: optionId, label: option.label.trim(), choices };
+    });
+  };
+
   const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -123,25 +179,14 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
 
     formData.customOptions.forEach((option, optionIndex) => {
       const errorsForOption: Record<string, string> = {};
-      if (!option.label.trim()) {
-        errorsForOption.label = 'Option label cannot be empty.';
-        hasErrors = true;
-      }
-      if (!option.id.trim()) {
-        errorsForOption.id = 'Option ID cannot be empty.';
-        hasErrors = true;
-      } else if (!/^[a-zA-Z0-9_]+$/.test(option.id.trim())) {
-        errorsForOption.id = 'ID must be alphanumeric with underscores only.';
+      if (!option.label.trim() || !toCamelSlug(option.label)) {
+        errorsForOption.label = 'Option name needs at least one letter or number.';
         hasErrors = true;
       }
 
       option.choices.forEach((choice, choiceIndex) => {
-        if (!choice.label.trim()) {
-          errorsForOption[`choice-${choiceIndex}-label`] = 'Choice label cannot be empty.';
-          hasErrors = true;
-        }
-        if (String(choice.value).trim() === '') {
-          errorsForOption[`choice-${choiceIndex}-value`] = 'Choice value cannot be empty.';
+        if (!choice.label.trim() || !toCamelSlug(choice.label)) {
+          errorsForOption[`choice-${choiceIndex}-label`] = 'Choice name needs at least one letter or number.';
           hasErrors = true;
         }
       });
@@ -163,6 +208,8 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
       return;
     }
 
+    const savedCustomOptions = buildCustomOptionsForSave(formData.customOptions);
+
     try {
       if (isAddingNew) {
         const generatedId = generateMenuItemId(formData.name.trim(), formData.category);
@@ -178,7 +225,7 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
         };
         const finalNewItem = {
           ...newItemData,
-          ...(formData.customOptions.length > 0 && { customOptions: formData.customOptions })
+          ...(savedCustomOptions.length > 0 && { customOptions: savedCustomOptions })
         };
         await addMenuItemToDb(finalNewItem as MenuItem);
         onShowToast('New dish added successfully!', 'success');
@@ -187,7 +234,7 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
         const finalUpdatedItem = {
           ...restOfItem,
           ...formData,
-          ...(formData.customOptions.length > 0 && { customOptions: formData.customOptions })
+          ...(savedCustomOptions.length > 0 && { customOptions: savedCustomOptions })
         };
         await addMenuItemToDb(finalUpdatedItem as MenuItem);
         onShowToast('Dish updated successfully!', 'success');
@@ -227,7 +274,7 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
       ...prev,
       customOptions: [
         ...prev.customOptions,
-        { id: '', label: '', mode: 'choice', choices: [{ label: '', value: '', price: 0 }] }
+        { label: '', choices: [{ label: '', price: 0 }] }
       ]
     }));
   };
@@ -250,7 +297,7 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
   const handleAddChoiceToOption = (optionIndex: number) => {
     setFormData(prev => {
       const newOptions = JSON.parse(JSON.stringify(prev.customOptions));
-      newOptions[optionIndex].choices.push({ label: '', value: '', price: 0 });
+      newOptions[optionIndex].choices.push({ label: '', price: 0 });
       return { ...prev, customOptions: newOptions };
     });
   };
@@ -312,8 +359,8 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
         <div className="bg-orange-50/70 border border-orange-100 p-6 rounded-3xl space-y-4 font-sans max-w-2xl">
           <div className="flex justify-between items-center pb-2 border-b border-orange-100/50">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-orange-100 text-brand-orange flex items-center justify-center font-bold text-xs">
-                🍜
+              <div className="w-8 h-8 rounded-full bg-orange-100 text-brand-orange flex items-center justify-center">
+                <Utensils size={14} />
               </div>
               <h3 className="font-display font-extrabold text-[#1a1a1a] text-sm">
                 {isAddingNew ? 'Register New Dish on Campus Menu' : `Edit: ${editingItem?.name}`}
@@ -350,10 +397,31 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Image URL *</label>
-                <div className="relative">
-                  <ImageIcon size={14} className="absolute left-3.5 top-3.5 text-gray-400" />
-                  <input type="text" required value={formData.image} onChange={(e) => setFormData({...formData, image: e.target.value})} className="w-full bg-white text-xs pl-10 pr-4 py-3 rounded-2xl border border-orange-100 outline-none focus:border-brand-orange text-[#1a1a1a] font-semibold font-mono" />
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1 min-w-0">
+                    <ImageIcon size={14} className="absolute left-3.5 top-3.5 text-gray-400" />
+                    <input type="text" required value={formData.image} onChange={(e) => setFormData({...formData, image: e.target.value})} className="w-full bg-white text-xs pl-10 pr-4 py-3 rounded-2xl border border-orange-100 outline-none focus:border-brand-orange text-[#1a1a1a] font-semibold font-mono" />
+                  </div>
+                  <div className="w-11 h-11 rounded-xl border border-orange-100 bg-white overflow-hidden flex items-center justify-center shrink-0" title={imagePreviewError ? "Couldn't load this image" : 'Live preview'}>
+                    {imagePreviewSrc && !imagePreviewError ? (
+                      <img
+                        src={imagePreviewSrc}
+                        alt="Preview"
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover"
+                        onError={() => setImagePreviewError(true)}
+                        onLoad={() => setImagePreviewError(false)}
+                      />
+                    ) : (
+                      <ImageIcon size={16} className={imagePreviewError ? 'text-red-300' : 'text-gray-300'} />
+                    )}
+                  </div>
                 </div>
+                {imagePreviewError && (
+                  <p className="text-[10px] text-red-500 font-bold mt-1 flex items-center gap-1">
+                    <AlertCircle size={11} className="shrink-0" /> Couldn't load this image — double-check the link.
+                  </p>
+                )}
               </div>
             </div>
             <div className="space-y-1">
@@ -362,11 +430,11 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
             </div>
             <div className="flex items-center gap-2 font-sans py-1">
               <input type="checkbox" id="popular-toggle" checked={formData.popular} onChange={(e) => setFormData({...formData, popular: e.target.checked})} className="w-4 h-4 rounded border-orange-200 text-brand-orange focus:ring-brand-orange" />
-              <label htmlFor="popular-toggle" className="text-xs font-bold text-gray-700 cursor-pointer select-none">Mark as Popular item 🔥 (displays on Homepage recommendations grid)</label>
+              <label htmlFor="popular-toggle" className="text-xs font-bold text-gray-700 cursor-pointer select-none">Mark as Popular item (displays on Homepage recommendations grid)</label>
             </div>
             <div className="flex items-center gap-2 font-sans py-1">
               <input type="checkbox" id="in-stock-toggle" checked={formData.inStock} onChange={(e) => setFormData({...formData, inStock: e.target.checked})} className="w-4 h-4 rounded border-orange-200 text-brand-orange focus:ring-brand-orange" />
-              <label htmlFor="in-stock-toggle" className="text-xs font-bold text-gray-700 cursor-pointer select-none">Available In Stock ✅ (displays on customer menu)</label>
+              <label htmlFor="in-stock-toggle" className="text-xs font-bold text-gray-700 cursor-pointer select-none">Available In Stock (displays on customer menu)</label>
             </div>
             <div className="space-y-3 pt-4 border-t border-orange-100/50">
               <div className="flex justify-between items-center">
@@ -378,66 +446,50 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
               {formData.customOptions.length === 0 && (<p className="text-xs text-gray-400 italic">No custom options added yet.</p>)}
               {formData.customOptions.map((option, optionIndex) => (
                 <div key={optionIndex} className="bg-gray-50 border border-gray-150 p-4 rounded-2xl space-y-3">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-sm font-bold text-[#1a1a1a]">Custom Option #{optionIndex + 1}</h4>
-                    <button type="button" onClick={() => handleRemoveCustomOption(optionIndex)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Remove this option">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex-1 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Option Name *</label>
+                      <input type="text" placeholder="e.g., Protein Option, Side, Extra Toppings" value={option.label} onChange={(e) => handleUpdateCustomOption(optionIndex, 'label', e.target.value)} className="w-full bg-white text-xs p-3 rounded-xl border border-gray-200 outline-none focus:border-brand-orange" required />
+                      {customOptionErrors[optionIndex]?.label && (
+                        <p className="text-[10px] text-red-500 font-bold mt-1 flex items-center gap-1">
+                          <AlertCircle size={11} className="shrink-0" /> {customOptionErrors[optionIndex].label}
+                        </p>
+                      )}
+                    </div>
+                    <button type="button" onClick={() => handleRemoveCustomOption(optionIndex)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg mt-5 shrink-0" title="Remove this option">
                       <Trash2 size={14} />
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Option Label *</label>
-                      <input type="text" placeholder="e.g., Protein Option" value={option.label} onChange={(e) => handleUpdateCustomOption(optionIndex, 'label', e.target.value)} className="w-full bg-white text-xs p-3 rounded-xl border border-gray-200 outline-none focus:border-brand-orange" required />
-                      {customOptionErrors[optionIndex]?.label && <p className="text-[10px] text-red-500 font-bold mt-1">⚠️ {customOptionErrors[optionIndex].label}</p>}
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Option ID (e.g., proteinType) *</label>
-                      <input type="text" placeholder="e.g., proteinType, sideChoice" value={option.id} onChange={(e) => handleUpdateCustomOption(optionIndex, 'id', e.target.value)} className="w-full bg-white text-xs p-3 rounded-xl border border-gray-200 outline-none focus:border-brand-orange" required />
-                      <p className="text-[9px] text-gray-400 flex items-center gap-1 mt-0.5"><Info size={10} />Used for internal tracking. Must be unique per item.</p>
-                      {customOptionErrors[optionIndex]?.id && <p className="text-[10px] text-red-500 font-bold mt-1">⚠️ {customOptionErrors[optionIndex].id}</p>}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Option Mode *</label>
-                    <select value={option.mode} onChange={(e) => handleUpdateCustomOption(optionIndex, 'mode', e.target.value as CustomOptionMode)} className="w-full bg-white text-xs p-3 rounded-xl border border-gray-200 outline-none focus:border-brand-orange">
-                      <option value="choice">Choice (e.g., Chicken, Beef)</option>
-                      <option value="quantity">Quantity (e.g., Extra Portion)</option>
-                    </select>
-                    {customOptionErrors[optionIndex]?.mode && <p className="text-[10px] text-red-500 font-bold mt-1">⚠️ {customOptionErrors[optionIndex].mode}</p>}
-                  </div>
                   <div className="space-y-2 pt-3 border-t border-gray-100">
                     <div className="flex justify-between items-center">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Choices</label>
-                      {option.mode === 'choice' && (
-                        <button type="button" onClick={() => handleAddChoiceToOption(optionIndex)} className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold flex items-center gap-1">
-                          <Plus size={10} /> Add Choice
-                        </button>
-                      )}
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Choices customers can pick</label>
+                      <button type="button" onClick={() => handleAddChoiceToOption(optionIndex)} className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold flex items-center gap-1">
+                        <Plus size={10} /> Add Choice
+                      </button>
                     </div>
                     {option.choices.length === 0 && (<p className="text-xs text-gray-400 italic">No choices added for this option.</p>)}
-                    {option.mode === 'quantity' && (<p className="text-xs text-gray-400 italic flex items-center gap-1"><Info size={10} />For 'Quantity' mode, only one choice is needed (e.g., "Extra Portion").</p>)}
-                    {(option.mode === 'choice' ? option.choices : option.choices.slice(0, 1)).map((choice, choiceIndex) => (
+                    {option.choices.map((choice, choiceIndex) => (
                       <div key={choiceIndex} className="flex items-center gap-2 bg-white border border-gray-100 p-2 rounded-lg">
                         <div className="flex-1 space-y-0.5">
-                          <input type="text" placeholder="Label (e.g., Fried Chicken)" value={choice.label} onChange={(e) => handleUpdateChoiceInOption(optionIndex, choiceIndex, 'label', e.target.value)} className="w-full bg-gray-50 text-xs p-2 rounded-md border border-gray-100 outline-none focus:border-brand-orange" required />
-                          {customOptionErrors[optionIndex]?.[`choice-${choiceIndex}-label`] && <p className="text-[10px] text-red-500 font-bold">⚠️ {customOptionErrors[optionIndex][`choice-${choiceIndex}-label`]}</p>}
+                          <input type="text" placeholder="e.g., Beef, Extra Portion" value={choice.label} onChange={(e) => handleUpdateChoiceInOption(optionIndex, choiceIndex, 'label', e.target.value)} className="w-full bg-gray-50 text-xs p-2 rounded-md border border-gray-100 outline-none focus:border-brand-orange" required />
+                          {customOptionErrors[optionIndex]?.[`choice-${choiceIndex}-label`] && (
+                            <p className="text-[10px] text-red-500 font-bold flex items-center gap-1">
+                              <AlertCircle size={11} className="shrink-0" /> {customOptionErrors[optionIndex][`choice-${choiceIndex}-label`]}
+                            </p>
+                          )}
                         </div>
-                        <div className="flex-1 space-y-0.5">
-                          <input type="text" placeholder="Value (e.g., friedChicken)" value={choice.value} onChange={(e) => handleUpdateChoiceInOption(optionIndex, choiceIndex, 'value', e.target.value)} className="w-full bg-gray-50 text-xs p-2 rounded-md border border-gray-100 outline-none focus:border-brand-orange" required />
-                          {customOptionErrors[optionIndex]?.[`choice-${choiceIndex}-value`] && <p className="text-[10px] text-red-500 font-bold">⚠️ {customOptionErrors[optionIndex][`choice-${choiceIndex}-value`]}</p>}
+                        <div className="w-28 flex items-center gap-1.5 shrink-0">
+                          <span className="text-xs text-gray-400 font-bold">+₦</span>
+                          <input type="number" placeholder="0" value={choice.price} onChange={(e) => handleUpdateChoiceInOption(optionIndex, choiceIndex, 'price', Number(e.target.value))} className="w-full bg-gray-50 text-xs p-2 rounded-md border border-gray-100 outline-none focus:border-brand-orange" min="0" required />
                         </div>
-                        <div className="w-24 space-y-0.5">
-                          <input type="number" placeholder="Add. Price" value={choice.price} onChange={(e) => handleUpdateChoiceInOption(optionIndex, choiceIndex, 'price', Number(e.target.value))} className="w-full bg-gray-50 text-xs p-2 rounded-md border border-gray-100 outline-none focus:border-brand-orange" min="0" required />
-                          {customOptionErrors[optionIndex]?.[`choice-${choiceIndex}-price`] && <p className="text-[10px] text-red-500 font-bold">⚠️ {customOptionErrors[optionIndex][`choice-${choiceIndex}-price`]}</p>}
-                        </div>
-                        <span className="text-xs text-gray-500 font-bold">₦</span>
-                        {option.mode === 'choice' && option.choices.length > 1 && (
-                          <button type="button" onClick={() => handleRemoveChoiceFromOption(optionIndex, choiceIndex)} className="p-1 text-red-400 hover:bg-red-50 rounded-md" title="Remove choice">
+                        {option.choices.length > 1 && (
+                          <button type="button" onClick={() => handleRemoveChoiceFromOption(optionIndex, choiceIndex)} className="p-1 text-red-400 hover:bg-red-50 rounded-md shrink-0" title="Remove choice">
                             <X size={12} />
                           </button>
                         )}
                       </div>
                     ))}
+                    <p className="text-[9px] text-gray-400 flex items-center gap-1 pt-1"><Info size={10} className="shrink-0" />Each choice gets its own +/- picker at checkout, so students can pick as many as they like.</p>
                   </div>
                 </div>
               ))}
@@ -467,7 +519,7 @@ export default function AdminMenuView({ onShowToast }: AdminMenuViewProps) {
                 </span>
                 {item.popular && (
                   <span className="absolute top-3 right-3 bg-brand-orange text-white font-sans font-black text-[9px] uppercase tracking-wide px-2.5 py-1 rounded-full shadow-md">
-                    POPULAR 🔥
+                    POPULAR
                   </span>
                 )}
               </div>

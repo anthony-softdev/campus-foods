@@ -57,8 +57,36 @@ export default function HomeView({ onNavigate, cart, onAddToCart, onUpdateCartQu
       text: 'Their customer service is incredible. Real quick delivery even during evening rain, and the Shawarma is gigantic filled with cream and chicken.',
       bg: 'bg-rose-100 text-rose-700',
       stars: 5
+    },
+    {
+      name: 'Fatima Y.',
+      initials: 'FY',
+      role: 'Faculty of Law (400L)',
+      text: 'I order the Suya every single week for study group nights. Always fresh, always spicy the right way, and it never arrives cold. Highly recommend!',
+      bg: 'bg-emerald-100 text-emerald-700',
+      stars: 5
+    },
+    {
+      name: 'Tunde K.',
+      initials: 'TK',
+      role: 'Faculty of Sciences (200L)',
+      text: 'Cheapest and fastest delivery I\'ve used on campus. The Indomie Special saved me during a 2am assignment crunch. Riders are always polite too.',
+      bg: 'bg-blue-100 text-blue-700',
+      stars: 5
+    },
+    {
+      name: 'Grace E.',
+      initials: 'GE',
+      role: 'Student Union Building Staff',
+      text: 'We order Campus Foods for every SUB event now. Bulk orders arrive on time and the food is still hot by the time it gets to the hall. Amazing team!',
+      bg: 'bg-purple-100 text-purple-700',
+      stars: 5
     }
   ];
+
+  // Repeated 4x to build a continuous scrolling track — see the
+  // `.animate-marquee` keyframe in index.css for why 4 copies specifically.
+  const marqueeReviews = [...reviews, ...reviews, ...reviews, ...reviews];
 
   return (
     <div className="space-y-20 pb-16 animate-fadeIn">
@@ -353,19 +381,26 @@ export default function HomeView({ onNavigate, cart, onAddToCart, onUpdateCartQu
         </div>
       </section>
 
-      {/* REVIEWS / TESTIMONIALS SECTION */}
+      {/* REVIEWS / TESTIMONIALS SECTION — animated scrolling strip */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-14">
           <span className="text-brand-orange font-bold text-xs uppercase tracking-wider font-sans bg-orange-50 px-3 py-1 rounded-full">Student Stories</span>
           <h2 className="text-3xl font-display font-extrabold text-[#1a1a1a] mt-2">What Students Are Saying 💬</h2>
-          <p className="text-sm font-sans text-gray-500 mt-2">Real reviews from students fueling their late-night reading sessions, class preps and hostel gatherings.</p>
+          <p className="text-sm font-sans text-gray-500 mt-2">Real reviews from students fueling their late-night reading sessions, class preps and hostel gatherings. Hover to pause and read.</p>
         </div>
+      </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {reviews.map((rev, idx) => (
-            <div 
-              key={idx} 
-              className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative"
+      {/* Full-bleed so the fade edges reach the browser edge; the row itself scrolls freely regardless of page width. */}
+      <div className="relative overflow-hidden">
+        {/* Fade the strip into the page background at both edges instead of a hard clip */}
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-12 sm:w-24 bg-gradient-to-r from-[#fafafa] to-transparent z-10" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-12 sm:w-24 bg-gradient-to-l from-[#fafafa] to-transparent z-10" />
+
+        <div className="flex w-max gap-6 px-4 sm:px-6 lg:px-8 animate-marquee">
+          {marqueeReviews.map((rev, idx) => (
+            <div
+              key={idx}
+              className="w-[300px] sm:w-[340px] shrink-0 bg-white border border-gray-100 rounded-2xl p-7 shadow-sm flex flex-col justify-between relative"
             >
               <div className="space-y-4">
                 {/* Stars and decoration */}
@@ -374,7 +409,7 @@ export default function HomeView({ onNavigate, cart, onAddToCart, onUpdateCartQu
                     <Star key={i} size={15} className="fill-amber-500" />
                   ))}
                 </div>
-                
+
                 {/* Text */}
                 <p className="text-sm font-sans text-gray-600 leading-relaxed italic">
                   "{rev.text}"
@@ -383,21 +418,21 @@ export default function HomeView({ onNavigate, cart, onAddToCart, onUpdateCartQu
 
               {/* Student Bio */}
               <div className="flex items-center gap-3 pt-6 mt-6 border-t border-gray-50">
-                <div className={`w-11 h-11 rounded-full flex items-center justify-center font-display font-bold text-sm select-none ${rev.bg}`}>
+                <div className={`w-11 h-11 rounded-full flex items-center justify-center font-display font-bold text-sm select-none shrink-0 ${rev.bg}`}>
                   {rev.initials}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h4 className="font-display font-bold text-sm text-[#1a1a1a]">{rev.name}</h4>
-                  <p className="text-[11px] font-sans text-gray-400 font-medium">{rev.role}</p>
+                  <p className="text-[11px] font-sans text-gray-400 font-medium truncate">{rev.role}</p>
                 </div>
               </div>
 
               {/* Decorative quotation mark */}
-              <div className="absolute top-6 right-8 text-6xl text-orange-100/40 font-serif leading-none select-none">“</div>
+              <div className="absolute top-6 right-8 text-6xl text-orange-100/40 font-serif leading-none select-none">"</div>
             </div>
           ))}
         </div>
-      </section>
+      </div>
 
       {/* Floating back-to-top button */}
       {showBackToTop && (

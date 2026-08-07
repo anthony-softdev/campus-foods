@@ -67,4 +67,24 @@ h1, h2, h3, h4, h5, h6 {
   animation: popIn 0.3s ease forwards;
 }
 
+/* Continuous horizontal scroller (e.g. the testimonials strip). The track
+   holds N identical copies of the content laid out side by side; sliding by
+   exactly 1/N of the track's width moves it by exactly one copy, so the loop
+   point is visually seamless. Paused on hover so a reader can finish a card. */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-25%); }
+}
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
+}
+
 

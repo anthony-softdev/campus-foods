@@ -417,7 +417,7 @@ export default function AdminView({ menuItems, onNavigate, currentUser, onSignOu
 
           <div className="space-y-2">
             <h1 className="text-2xl font-display font-extrabold text-brand-dark tracking-tight">
-              Admin Access Only 🔒
+              Admin Access Only
             </h1>
             <p className="text-xs text-gray-400 leading-relaxed font-sans font-medium">
               The administrator control dashboard is locked for security. Only staff members with designated Admin roles can modify the menu items, alter stock/descriptions, or manage incoming student orders.
@@ -486,7 +486,7 @@ export default function AdminView({ menuItems, onNavigate, currentUser, onSignOu
               </span>
             </div>
             <h1 className="text-3xl font-display font-black text-[#1a1a1a] tracking-tight">
-              Uni Kitchen Portals 🏢
+              Uni Kitchen Portals
             </h1>
             <p className="text-sm font-sans text-gray-500 mt-1">
               Live campus cooking queue, orders management, and real-time menu catalog adjustment.
